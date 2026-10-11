@@ -118,9 +118,10 @@ assert.equal(unregistered.collections.length, 0, 'editor features can all be dis
 function inputFixture(zone, value, find = false) {
     const attrs = new Map();
     return {
-        value, nodeType: 1, style: {},
+        value, nodeType: 1, tagName: 'INPUT', style: {},
         getAttribute(name) { return attrs.get(name) || null; },
         setAttribute(name, data) { attrs.set(name, data); },
+        removeAttribute(name) { attrs.delete(name); },
         matches(selector) { return selector.startsWith('input') || selector.startsWith('.monaco-workbench input'); },
         closest(selector) {
             if (find && selector === '.monaco-editor') return this;
@@ -141,16 +142,29 @@ for (const [zone, setting] of Object.entries(configs)) {
     const enabled = runtime();
     enabled.context.__test.processInputs(input); enabled.flush();
     assert.equal(input.getAttribute('dir'), 'rtl', zone);
-    input.value = 'English search';
+    input.value = 'جستجوی فارسی and English continuation';
     enabled.context.__test.processInputs(input); enabled.flush();
-    assert.equal(input.getAttribute('dir'), 'ltr', zone);
+    assert.equal(input.getAttribute('dir'), 'rtl', 'first direction stays locked while typing ' + zone);
     input.value = '';
     enabled.context.__test.processInputs(input); enabled.flush();
-    assert.equal(input.getAttribute('dir'), 'ltr', 'empty ' + zone);
+    assert.equal(input.getAttribute('dir'), null, 'empty input releases automatic direction ' + zone);
+    input.value = 'English search';
+    enabled.context.__test.processInputs(input); enabled.flush();
+    assert.equal(input.getAttribute('dir'), 'ltr', 'fresh input detects a new direction ' + zone);
+    input.value = 'English search فارسی';
+    enabled.context.__test.processInputs(input); enabled.flush();
+    assert.equal(input.getAttribute('dir'), 'ltr', 'new direction stays locked while typing ' + zone);
     const disabled = inputFixture(zone, 'جستجوی فارسی');
     runtime({ areas: { [setting]: false } }).context.__test.processInputs(disabled);
     assert.equal(disabled.getAttribute('dir'), null, 'disabled ' + zone);
 }
+const textarea = inputFixture('other', 'فارسی');
+textarea.tagName = 'TEXTAREA';
+r.context.__test.processInputs(textarea); r.flush();
+assert.equal(textarea.style.unicodeBidi, 'plaintext', 'textarea paragraphs resolve direction independently');
+textarea.value = '';
+r.context.__test.processInputs(textarea); r.flush();
+assert.equal(textarea.style.unicodeBidi, '', 'clearing textarea restores its original bidi style');
 const find = inputFixture('search', 'پیدا کن', true);
 r.context.__test.processInputs(find); r.flush();
 assert.equal(find.getAttribute('dir'), 'rtl', 'Monaco Find reads input value, not code');

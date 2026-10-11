@@ -2,8 +2,8 @@
   "name": "rtl-copilot",
   "displayName": "Noor RTL — VS Code, Copilot & AI Chat",
   "description": "راست‌چین هوشمند نور برای فارسی و عربی در VS Code، GitHub Copilot و AI Chat؛ تنظیم مستقل ورودی‌ها، Markdown و کامنت‌های ادیتور.",
-  "version": "2.9.17",
-  "publisher": "rtl-tools",
+  "version": "2.9.18",
+  "publisher": "Noor-CRCIS",
   "license": "MIT",
   "icon": "icon.png",
   "repository": {
@@ -26,7 +26,7 @@
   ],
   "badges": [
     {
-      "url": "https://img.shields.io/badge/version-2.9.17-orange.svg",
+      "url": "https://img.shields.io/badge/version-2.9.18-orange.svg",
       "href": "https://github.com/Noor-CRCIS/rtl-copilot",
       "label": "version",
       "description": "نسخهٔ افزونه"

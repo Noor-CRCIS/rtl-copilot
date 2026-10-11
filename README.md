@@ -13,7 +13,7 @@
 
 ## نصب و شروع کار
 
-1. **نصب افزونه:** فایل [نسخهٔ انتشار](https://github.com/Noor-CRCIS/rtl-copilot/releases) را دریافت کنید و از فرمان `Extensions: Install from VSIX...` در VS Code نصب کنید. نام بستهٔ این نسخه `rtl-copilot-2.9.17.vsix` است.
+1. **نصب افزونه:** فایل [نسخهٔ انتشار](https://github.com/Noor-CRCIS/rtl-copilot/releases) را دریافت کنید و از فرمان `Extensions: Install from VSIX...` در VS Code نصب کنید. نام بستهٔ این نسخه `rtl-copilot-2.9.18.vsix` است.
 2. **اعمال تغییرات رابط:** در Command Palette، فرمان «نصب مجدد پچ» از گروه «راست‌چین هوشمند نور» را اجرا کنید.
 3. **راه‌اندازی دوباره:** تمام پنجره‌های VS Code را کامل ببندید و برنامه را دوباره باز کنید.
 4. **استفاده در Remote SSH:** رابط کاربری روی رایانهٔ محلی نمایش داده می‌شود؛ نصب و اعمال پچ باید روی همان VS Code محلی انجام شود، نه فقط سرور.
@@ -30,10 +30,10 @@ npm test
 npm run package
 ```
 
-پس از موفقیت آزمون‌ها، فایل `rtl-copilot-2.9.17.vsix` در همین پوشه ساخته می‌شود. برای نصب بسته در VS Code:
+پس از موفقیت آزمون‌ها، فایل `rtl-copilot-2.9.18.vsix` در همین پوشه ساخته می‌شود. برای نصب بسته در VS Code:
 
 ```bash
-code --install-extension rtl-copilot-2.9.17.vsix
+code --install-extension rtl-copilot-2.9.18.vsix
 ```
 
 همچنین می‌توانید در VS Code فرمان `Extensions: Install from VSIX...` را اجرا و فایل ساخته‌شده را انتخاب کنید. راهنمای کامل انتشار در [راهنمای توسعه و انتشار](PUBLISHING.md) آمده است.
@@ -42,7 +42,7 @@ code --install-extension rtl-copilot-2.9.17.vsix
 
 در Settings عبارت `rtlCopilot` را جستجو کنید. پس از تغییر تنظیم‌های پچ، «نصب مجدد پچ» و خروج کامل از VS Code لازم است.
 
-- **ورودی‌ها و پرامپت — پیش‌فرض روشن:** تنظیم `rtlCopilot.autoInputDirection` جهت خودکار را کنترل می‌کند. در پرامپت، جهت هر خط با نخستین حرف فارسی یا لاتین مشخص می‌شود و ادامهٔ تایپ آن را عوض نمی‌کند.
+- **همهٔ کادرهای ورودی — پیش‌فرض روشن:** تنظیم `rtlCopilot.autoInputDirection` جهت خودکار پرامپت، جستجو، Find/Replace، تنظیمات، Command Palette و سایر ورودی‌های پشتیبانی‌شده را کنترل می‌کند. جهت هر ورودی با نخستین حرف فارسی یا لاتین قفل می‌شود و با ادامهٔ تایپ تغییر نمی‌کند؛ پس از پاک‌کردن کامل کادر، جهت متن بعدی دوباره تشخیص داده می‌شود. در textareaهای چندخطی، جهت هر پاراگراف نیز جداگانه نمایش داده می‌شود.
 - **کامنت‌های مستقل فارسی — پیش‌فرض روشن:** با `rtlCopilot.areas.editorComments` خاموش یا روشن می‌شوند.
 - **جهت خودکار کل ادیتور — پیش‌فرض خاموش:** تنظیم `rtlCopilot.autoEditorDirection` مستقل از کامنت‌هاست. برای کنترل دستی فایل‌ها، `rtlCopilot.areas.editorsCode` را روشن کنید.
 - **میان‌بر دستی تغییر جهت:** `Ctrl + Shift + Right` خط جاری را راست‌به‌چپ (RTL) و `Ctrl + Shift + Left` آن را چپ‌به‌راست (LTR) می‌کند. `Shift` به‌تنهایی جهت را تغییر نمی‌دهد؛ انتخاب دستی بر تشخیص خودکار مقدم است.
@@ -69,20 +69,20 @@ code --install-extension rtl-copilot-2.9.17.vsix
 
 ## محصولات و خدمات مرکز نور
 
-- 🌐 **پایگاه مجلات تخصصی نور (#نورمگز):** [**noorsoft.org/fa/sites/View/102**](https://search.eitaa.com/?url=https://noorsoft.org/fa/sites/View/102)
-- 🌐 **پایگاه کتابخانه دیجیتال نور (#نورلایب):** [**noorsoft.org/fa/sites/View/105**](https://search.eitaa.com/?url=https://noorsoft.org/fa/sites/View/105)
-- 🌐 **فروشگاه اینترنتی محصولات نور (#نورشاپ):** [**noorsoft.org/fa/sites/View/108**](https://search.eitaa.com/?url=https://noorsoft.org/fa/sites/View/108)
-- 🌐 **پایگاه پیشخوان برخط نرم‌افزارهای نور (#ابرنور):** [**noorsoft.org/fa/sites/View/12702**](https://search.eitaa.com/?url=https://noorsoft.org/fa/sites/View/12702)
+- 🌐 **پایگاه مجلات تخصصی نور (#نورمگز):** [**noorsoft.org/fa/sites/View/102**](https://noorsoft.org/fa/sites/View/102)
+- 🌐 **پایگاه کتابخانه دیجیتال نور (#نورلایب):** [**noorsoft.org/fa/sites/View/105**](https://noorsoft.org/fa/sites/View/105)
+- 🌐 **فروشگاه اینترنتی محصولات نور (#نورشاپ):** [**noorsoft.org/fa/sites/View/108**](https://noorsoft.org/fa/sites/View/108)
+- 🌐 **پایگاه پیشخوان برخط نرم‌افزارهای نور (#ابرنور):** [**noorsoft.org/fa/sites/View/12702**](https://noorsoft.org/fa/sites/View/12702)
 
 🔻🔻🔻🔻🔻🔻
 
 👈 **تا حالا با چت بات اسلامی گفتگو کردی؟!!!**
 
-- 🌐 سامانه گفت‌وگوی هوشمند با کتاب: [**noorlib.ir/chatbot**](https://search.eitaa.com/?url=https://noorlib.ir/chatbot)
-- 🌐 سامانه گفتگو هوشمند با احادیث: [**chattohadith.inoor.ir**](https://search.eitaa.com/?url=https://chattohadith.inoor.ir)
-- 🌐 سامانه گفتگو هوشمند با تفاسیر: [**chattotafsir.inoor.ir**](https://search.eitaa.com/?url=https://chattotafsir.inoor.ir)
-- 🌐 سامانه گفتگو هوشمند با آثار استاد شهید مرتضی مطهری: [**motahari.noorlib.ir**](https://search.eitaa.com/?url=https://motahari.noorlib.ir)
+- 🌐 سامانه گفت‌وگوی هوشمند با کتاب: [**noorlib.ir/chatbot**](https://noorlib.ir/chatbot)
+- 🌐 سامانه گفتگو هوشمند با احادیث: [**chattohadith.inoor.ir**](https://chattohadith.inoor.ir)
+- 🌐 سامانه گفتگو هوشمند با تفاسیر: [**chattotafsir.inoor.ir**](https://chattotafsir.inoor.ir)
+- 🌐 سامانه گفتگو هوشمند با آثار استاد شهید مرتضی مطهری: [**motahari.noorlib.ir**](https://motahari.noorlib.ir)
 
 ▪️▫️▪️▫️▪️
 
-**مرکز تحقیقات کامپیوتری علوم اسلامی (نور):** پیشگام در داده‌پردازی هوشمند علوم اسلامی و انسانی — [**noorsoft.org**](https://search.eitaa.com/?url=https://noorsoft.org)
+**مرکز تحقیقات کامپیوتری علوم اسلامی (نور):** پیشگام در داده‌پردازی هوشمند علوم اسلامی و انسانی — [**noorsoft.org**](https://noorsoft.org)

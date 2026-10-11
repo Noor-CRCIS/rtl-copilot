@@ -6,7 +6,7 @@
 
 1. مخزن `rtl-copilot` را با visibility مورد نظر (Public برای دسترسی عمومی) در سازمان `Noor-CRCIS` بدون README/License خودکار بسازید.
 2. **همین پوشهٔ `latest/`** را ریشهٔ مخزن قرار دهید. فایل‌های `node_modules/`، `download/`، `okVersion/`، `rtl-copilot/`، `*.vsix` و اطلاعات محرمانه را وارد Git نکنید؛ `.gitignore` موارد ساختنی را کنار می‌گذارد. پیش از انتشار تاریخچه و مجوزها را بازبینی کنید.
-3. شناسهٔ `publisher: rtl-tools` در `package.json` برای VS Code Marketplace است و لازم نیست با نام سازمان GitHub یکسان باشد. فقط با اجازهٔ مالک Publisher آن را عوض کنید.
+3. شناسهٔ `publisher: Noor-CRCIS` در `package.json` باید با Publisher انتخاب‌شده در VS Code Marketplace یکسان باشد. برای انتشار، حساب Publisher با همین شناسه و مجوز انتشار لازم است؛ شناسهٔ Publisher با نام سازمان GitHub یکی نیست مگر اینکه خودتان آن را چنین انتخاب کنید.
 
 ## CI و انتشار GitHub
 
@@ -41,7 +41,7 @@
 Node.js 22 و npm کافی است؛ `@vscode/vsce` از lockfile پروژه نصب می‌شود.
 
 - دسترسی مجاز به سازمان GitHub `Noor-CRCIS` و مخزن `rtl-copilot`
-- برای انتشار **اختیاری** در Marketplace، مالکیت شناسهٔ `rtl-tools` باید پیشاپیش تأیید شده باشد؛ صرف داشتن دسترسی سازمان GitHub کافی نیست.
+- برای انتشار **اختیاری** در Marketplace، حساب Publisher با شناسهٔ `Noor-CRCIS` و مجوز انتشار باید پیشاپیش آماده باشد؛ صرف داشتن دسترسی سازمان GitHub کافی نیست. اگر نسخه‌ای با Publisher دیگری قبلاً منتشر شده، تغییر شناسه افزونه را به‌صورت یک شناسهٔ Marketplace جداگانه ایجاد می‌کند؛ برای حفظ همان فهرست انتشار، ابتدا انتقال رسمی Publisher را پیگیری کنید.
 
 ---
 
@@ -50,7 +50,7 @@ Node.js 22 و npm کافی است؛ `@vscode/vsce` از lockfile پروژه نص
 ```bash
 npm ci
 npm test              # engine + native direction + comment/input + documentation rendering
-npm run package       # خروجی: rtl-copilot-2.9.17.vsix
+npm run package       # خروجی: rtl-copilot-2.9.18.vsix
 ```
 
 مستقیم:
@@ -62,7 +62,7 @@ npm run package       # خروجی: rtl-copilot-2.9.17.vsix
 بررسی محتوای VSIX (باید `node_modules` و تست‌ها داخل بسته نباشند):
 
 ```bash
-unzip -l rtl-copilot-2.9.17.vsix
+unzip -l rtl-copilot-2.9.18.vsix
 ```
 
 ---
@@ -88,12 +88,12 @@ npx vsce publish --no-dependencies --allow-missing-repository
 
 ## ۶) انتشار فایل VSIX در GitHub Releases
 
-بعد از ادغام تغییرات در `main` و تأیید نسخهٔ `package.json`، tag `v2.9.17` را روی commit موردنظر بسازید و push کنید. گردش‌کار پس از تست، VSIX را می‌سازد و SHA-256 آن را به‌همراه فایل VSIX در Release قرار می‌دهد.
+بعد از ادغام تغییرات در `main` و تأیید نسخهٔ `package.json`، tag `v2.9.18` را روی commit موردنظر بسازید و push کنید. گردش‌کار پس از تست، VSIX را می‌سازد و SHA-256 آن را به‌همراه فایل VSIX در Release قرار می‌دهد.
 
 یا دستی از https://github.com/Noor-CRCIS/rtl-copilot/releases :
 
-1. `Draft a new release` → tag `v2.9.17` (تنها اگر انتشار خودکار tag را استفاده نمی‌کنید)
-2. آپلود `rtl-copilot-2.9.17.vsix`
+1. `Draft a new release` → tag `v2.9.18` (تنها اگر انتشار خودکار tag را استفاده نمی‌کنید)
+2. آپلود `rtl-copilot-2.9.18.vsix`
 3. ثبت SHA-256 در body ریلیز
 
 ---
