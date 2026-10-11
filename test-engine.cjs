@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const engine = require('./rtl-engine');
 
-assert.equal(engine.VERSION, '2.9.19');
+assert.equal(engine.VERSION, '2.9.20');
 
 const original = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src \'self\'\"></head><body></body></html>';
 const patched = engine.applyPatchToHtml(original);
@@ -370,17 +370,28 @@ assert.match(extensionSource, /const nextBundle = nativeEditorEnabled \? engine\
 assert.match(extensionSource, /const nativeRequired = options\.areas\.inputs && options\.areas\.promptInputs \|\| options\.areas\.editorsCode \|\| options\.areas\.editorComments/);
 assert.match(extensionSource, /let busy = false/);
 assert.match(extensionSource, /function executeTransaction\(transaction, enabled\)/);
-assert.match(extensionSource, /writeEntries\(\[\.\.\.backupEntries, \.\.\.transaction\.entries\]/);
+assert.match(extensionSource, /const entries = \[\.\.\.backupEntries, \.\.\.transaction\.entries\]/);
+assert.match(extensionSource, /await writeEntries\(entries, transaction\.productInfo\.appBase\)/);
 assert.match(extensionSource, /verifyTransaction\(transaction, enabled\)/);
 assert.match(extensionSource, /require\('node:child_process'\)/);
-assert.match(extensionSource, /showWarningMessage\([\s\S]*?modal: true/);
+assert.doesNotMatch(extensionSource, /showWarningMessage\([\s\S]*?modal: true/, 'OS elevation is the only authorization prompt');
+assert.match(extensionSource, /requesting one elevated transaction/);
+assert.match(extensionSource, /error\.elevatedWriteHandled = true/);
+assert.match(extensionSource, /if \(error\.elevatedWriteHandled\) throw error/);
+assert.match(extensionSource, /permissionError\.appliedEntries = appliedEntries/);
+assert.match(extensionSource, /const appliedEntries = error\.appliedEntries \|\| entries/);
 assert.match(extensionSource, /pkexec/);
 assert.match(extensionSource, /Start-Process[\s\S]*?RunAs/);
+assert.match(extensionSource, /-ErrorReport/);
 assert.match(extensionSource, /privileged-write\.ps1/);
 assert.match(extensionSource, /privileged-write\.sh/);
 assert.match(extensionSource, /async function runElevatedWrite\(entries, appRoot\)/);
 assert.match(extensionSource, /fs\.renameSync\(tempPath, filePath\)/);
 assert.match(extensionSource, /\['EACCES', 'EPERM', 'EROFS'\]/);
+const windowsHelper = fs.readFileSync(path.join(__dirname, 'privileged-write.ps1'), 'utf8');
+assert.match(windowsHelper, /\[IO\.File\]::WriteAllText\(\$ErrorReport/);
+assert.match(windowsHelper, /Write verification failed/);
+assert.match(windowsHelper, /Rollback failed for/);
 assert.match(extensionSource, /cleanProduct\.commit !== product\.data\.commit \|\| cleanProduct\.version !== product\.data\.version/);
 assert.doesNotMatch(extensionSource, /stageOfflineTransaction/);
 assert.doesNotMatch(extensionSource, /currentOperation/);
@@ -388,4 +399,4 @@ assert.doesNotMatch(extensionSource, /operationStatus/);
 assert.equal(fs.existsSync(path.join(__dirname, 'offline-patch.ps1')), false);
 
 fs.rmSync(temp, { recursive: true, force: true });
-console.log('RTL_ENGINE_2_9_19_TESTS_OK');
+console.log('RTL_ENGINE_2_9_20_TESTS_OK');

@@ -2,10 +2,17 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Manifest,
     [Parameter(Mandatory = $true)]
-    [string]$Root
+    [string]$Root,
+    [string]$ErrorReport
 )
 
 $ErrorActionPreference = 'Stop'
+trap {
+    if ($ErrorReport) {
+        [IO.File]::WriteAllText($ErrorReport, $_.Exception.ToString())
+    }
+    throw
+}
 $document = Get-Content -LiteralPath $Manifest -Raw | ConvertFrom-Json
 if ($document.version -ne 1 -or -not $document.entries) {
     throw 'Invalid RTL Copilot write manifest.'
@@ -102,6 +109,25 @@ try {
             Write-Atomic $item.Path $item.Content
         }
         $applied++
+    }
+    foreach ($item in $items) {
+        if ($item.Operation -eq 'delete') {
+            if ([IO.File]::Exists($item.Path)) {
+                throw "Delete verification failed: $($item.Path)"
+            }
+        } else {
+            $actual = [IO.File]::ReadAllBytes($item.Path)
+            $sha = [Security.Cryptography.SHA256]::Create()
+            try {
+                $expectedHash = [Convert]::ToBase64String($sha.ComputeHash($item.Content))
+                $actualHash = [Convert]::ToBase64String($sha.ComputeHash($actual))
+            } finally {
+                $sha.Dispose()
+            }
+            if ($actualHash -ne $expectedHash) {
+                throw "Write verification failed: $($item.Path)"
+            }
+        }
     }
 } catch {
     $writeError = $_

@@ -207,7 +207,7 @@ function execFileAsync(file, args, options) {
     return new Promise((resolve, reject) => {
         execFile(file, args, options, (error, stdout, stderr) => {
             if (error) {
-                const detail = stderr && stderr.trim();
+                const detail = [stderr, stdout].filter(Boolean).map(value => value.trim()).filter(Boolean).join('\n');
                 if (detail) error.message = `${error.message}: ${detail}`;
                 reject(error);
             } else resolve(stdout);
@@ -230,32 +230,42 @@ async function runElevatedWrite(entries, appRoot) {
         if (process.platform === 'win32') {
             fs.writeFileSync(manifestPath, JSON.stringify({ version: 1, entries: normalizedEntries }), { mode: 0o600 });
             const helperPath = path.join(extensionContext.extensionPath, 'privileged-write.ps1');
+            const errorReportPath = path.join(tempDir, 'helper-error.txt');
             const quotePowerShell = value => `'${value.replace(/'/g, "''")}'`;
             const script = [
                 '$ErrorActionPreference = "Stop"',
                 `$helper = ${quotePowerShell(helperPath)}`,
                 `$manifest = ${quotePowerShell(manifestPath)}`,
                 `$tempDirectory = ${quotePowerShell(tempDir)}`,
+                `$errorReport = ${quotePowerShell(errorReportPath)}`,
                 `$root = ${quotePowerShell(root)}`,
                 '$administrators = [System.Security.Principal.SecurityIdentifier]::new("S-1-5-32-544")',
                 '$directoryAcl = Get-Acl -LiteralPath $tempDirectory',
-                '$directoryRule = New-Object System.Security.AccessControl.FileSystemAccessRule($administrators, "ReadAndExecute", "ContainerInherit,ObjectInherit", "None", "Allow")',
+                '$directoryRule = New-Object System.Security.AccessControl.FileSystemAccessRule($administrators, "Modify", "ContainerInherit,ObjectInherit", "None", "Allow")',
                 '$directoryAcl.SetAccessRule($directoryRule)',
                 'Set-Acl -LiteralPath $tempDirectory -AclObject $directoryAcl',
                 '$manifestAcl = Get-Acl -LiteralPath $manifest',
                 '$manifestRule = New-Object System.Security.AccessControl.FileSystemAccessRule($administrators, "Read", "Allow")',
                 '$manifestAcl.SetAccessRule($manifestRule)',
                 'Set-Acl -LiteralPath $manifest -AclObject $manifestAcl',
-                '$arguments = \'-NoProfile -ExecutionPolicy Bypass -File "\' + $helper + \'" -Manifest "\' + $manifest + \'" -Root "\' + $root + \'"\'',
+                '$arguments = \'-NoProfile -ExecutionPolicy Bypass -File "\' + $helper + \'" -Manifest "\' + $manifest + \'" -Root "\' + $root + \'" -ErrorReport "\' + $errorReport + \'"\'',
                 '$process = Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -Verb RunAs -Wait -PassThru',
+                'if ($process.ExitCode -ne 0 -and (Test-Path -LiteralPath $errorReport)) {',
+                '  [Console]::Error.WriteLine((Get-Content -LiteralPath $errorReport -Raw))',
+                '}',
                 'exit $process.ExitCode',
             ].join('\n');
-            await execFileAsync('powershell.exe', [
-                '-NoProfile',
-                '-NonInteractive',
-                '-EncodedCommand',
-                Buffer.from(script, 'utf16le').toString('base64'),
-            ], { windowsHide: true, timeout: 120000, maxBuffer: 1024 * 1024 });
+            try {
+                await execFileAsync('powershell.exe', [
+                    '-NoProfile',
+                    '-NonInteractive',
+                    '-EncodedCommand',
+                    Buffer.from(script, 'utf16le').toString('base64'),
+                ], { windowsHide: true, timeout: 120000, maxBuffer: 1024 * 1024 });
+            } catch (error) {
+                error.elevatedWriteHandled = true;
+                throw error;
+            }
         } else if (process.platform === 'linux') {
             const encodePath = value => Buffer.from(value, 'utf8').toString('base64');
             const lines = [];
@@ -265,11 +275,16 @@ async function runElevatedWrite(entries, appRoot) {
             }
             fs.writeFileSync(manifestPath, `${lines.join('\n')}\n`, { mode: 0o600 });
             const helperPath = path.join(extensionContext.extensionPath, 'privileged-write.sh');
-            await execFileAsync('pkexec', ['/bin/bash', helperPath, manifestPath, root], {
-                windowsHide: true,
-                timeout: 120000,
-                maxBuffer: 1024 * 1024,
-            });
+            try {
+                await execFileAsync('pkexec', ['/bin/bash', helperPath, manifestPath, root], {
+                    windowsHide: true,
+                    timeout: 120000,
+                    maxBuffer: 1024 * 1024,
+                });
+            } catch (error) {
+                error.elevatedWriteHandled = true;
+                throw error;
+            }
         } else {
             throw new Error(`درخواست دسترسی بالاتر در ${process.platform} پشتیبانی نمی‌شود.`);
         }
@@ -283,17 +298,21 @@ async function writeEntries(entries, appRoot) {
     if (!entries.length) return;
     lastWriteContext = { paths: entries.map(entry => path.resolve(entry.path)) };
     if (elevatedWrite) return runElevatedWrite(entries, appRoot);
+    const appliedEntries = [];
     for (const entry of entries) {
         try {
             if (entry.operation === 'delete') {
                 if (exists(entry.path)) fs.unlinkSync(entry.path);
             } else atomicWrite(entry.path, entry.content);
+            appliedEntries.push(entry);
         } catch (error) {
             if (['EACCES', 'EPERM', 'EROFS'].includes(error.code)) {
                 const permissionError = new Error(`نصب VS Code اجازهٔ نوشتن در ${entry.path} را نمی‌دهد. (${error.code})`, { cause: error });
                 permissionError.code = error.code;
+                permissionError.appliedEntries = appliedEntries;
                 throw permissionError;
             }
+            error.appliedEntries = appliedEntries;
             throw error;
         }
     }
@@ -362,26 +381,35 @@ function verifyTransaction(transaction, enabled) {
 }
 
 async function executeTransaction(transaction, enabled) {
-    const originals = transaction.entries.map(entry => ({
+    const refreshBackups = engine.markerState(fs.readFileSync(transaction.htmlPath, 'utf8')) === 'absent'
+        && (!transaction.bundlePath || engine.editorBridgeState(fs.readFileSync(transaction.bundlePath, 'utf8')) === 'absent');
+    const backupEntries = transaction.entries
+        .filter(entry => exists(entry.path) && entry.path !== transaction.runtimePath)
+        .map(entry => backupEntry(entry.path, fs.readFileSync(entry.path), refreshBackups))
+        .filter(Boolean);
+    const entries = [...backupEntries, ...transaction.entries];
+    const originals = entries.map(entry => ({
         path: entry.path,
         existed: exists(entry.path),
         content: exists(entry.path) ? fs.readFileSync(entry.path) : null,
     }));
-    const refreshBackups = engine.markerState(originals[0].content.toString('utf8')) === 'absent'
-        && (!transaction.bundlePath || engine.editorBridgeState(fs.readFileSync(transaction.bundlePath, 'utf8')) === 'absent');
-    const backupEntries = originals
-        .filter(item => item.existed && item.path !== transaction.runtimePath)
-        .map(item => backupEntry(item.path, item.content, refreshBackups))
-        .filter(Boolean);
     try {
-        await writeEntries([...backupEntries, ...transaction.entries], transaction.productInfo.appBase);
+        await writeEntries(entries, transaction.productInfo.appBase);
         verifyTransaction(transaction, enabled);
     } catch (error) {
-        if (isPermissionError(error)) throw error;
-        const rollbackEntries = [...originals].reverse().map(original => original.existed
-            ? { path: original.path, content: original.content }
-            : { path: original.path, operation: 'delete' });
-        try { await writeEntries(rollbackEntries, transaction.productInfo.appBase); } catch (rollbackError) { log(`rollback failed: ${rollbackError.message}`); }
+        if (error.elevatedWriteHandled) throw error;
+        const appliedEntries = error.appliedEntries || entries;
+        if (appliedEntries.length) {
+            const originalsByPath = new Map(originals.map(original => [original.path, original]));
+            const rollbackEntries = [...appliedEntries].reverse().map(entry => {
+                const original = originalsByPath.get(entry.path);
+                return original.existed
+                    ? { path: original.path, content: original.content }
+                    : { path: original.path, operation: 'delete' };
+            });
+            try { await writeEntries(rollbackEntries, transaction.productInfo.appBase); }
+            catch (rollbackError) { log(`rollback failed: ${rollbackError.message}`); }
+        }
         throw error;
     }
 }
@@ -445,21 +473,11 @@ async function safeRun(action, label) {
             let error = initialError;
             if (isPermissionError(error) && lastWriteContext && ['win32', 'linux'].includes(process.platform)) {
                 const targets = lastWriteContext.paths.map(target => `• ${target}`).join('\n');
-                const choice = await vscode.window.showWarningMessage(
-                    `${EXT_LABEL}: برای تغییر فایل‌های نصب VS Code دسترسی بالاتر لازم است.`,
-                    {
-                        modal: true,
-                        detail: `در صورت تأیید، ویندوز UAC یا احراز هویت لینوکس باز می‌شود. فقط فایل‌های زیر و پشتیبان‌های همین نصب تغییر می‌کنند:\n${targets}\n\nاگر درخواست سیستم‌عامل را رد کنید، هیچ مجوزی گرفته نمی‌شود و عملیات انجام نخواهد شد.`,
-                    },
-                    'تأیید و درخواست دسترسی',
-                );
-                if (choice === 'تأیید و درخواست دسترسی') {
-                    log(`requesting elevated write for ${lastWriteContext.paths.length} file(s)`);
-                    elevatedWrite = true;
-                    try { return await action(); }
-                    catch (elevationError) { error = elevationError; }
-                    finally { elevatedWrite = false; }
-                }
+                log(`requesting one elevated transaction for ${lastWriteContext.paths.length} file(s):\n${targets}`);
+                elevatedWrite = true;
+                try { return await action(); }
+                catch (elevationError) { error = elevationError; }
+                finally { elevatedWrite = false; }
             }
             log(`ERROR ${label}: ${error.stack || error.message}`);
             const choice = await vscode.window.showErrorMessage(`${EXT_LABEL}: ${error.message}`, 'Log');
