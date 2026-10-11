@@ -2,7 +2,7 @@
   "name": "rtl-copilot",
   "displayName": "Noor RTL — VS Code, Copilot & AI Chat",
   "description": "راست‌چین هوشمند نور برای فارسی و عربی در VS Code، GitHub Copilot و AI Chat؛ تنظیم مستقل ورودی‌ها، Markdown و کامنت‌های ادیتور.",
-  "version": "2.9.18",
+  "version": "2.9.19",
   "publisher": "Noor-CRCIS",
   "license": "MIT",
   "icon": "icon.png",
@@ -26,7 +26,7 @@
   ],
   "badges": [
     {
-      "url": "https://img.shields.io/badge/version-2.9.18-orange.svg",
+      "url": "https://img.shields.io/badge/version-2.9.19-orange.svg",
       "href": "https://github.com/Noor-CRCIS/rtl-copilot",
       "label": "version",
       "description": "نسخهٔ افزونه"
@@ -439,7 +439,7 @@
     }
   },
   "scripts": {
-    "test": "node test-engine.cjs && node test-native-direction.cjs && node test-comment-input.cjs && node test-docs.cjs",
+    "test": "node test-engine.cjs && node test-native-direction.cjs && node test-comment-input.cjs && node test-privileged-write.cjs && node test-docs.cjs",
     "package": "vsce package --no-dependencies --allow-missing-repository"
   },
   "devDependencies": {

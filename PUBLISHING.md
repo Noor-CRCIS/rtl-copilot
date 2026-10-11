@@ -50,7 +50,7 @@ Node.js 22 و npm کافی است؛ `@vscode/vsce` از lockfile پروژه نص
 ```bash
 npm ci
 npm test              # engine + native direction + comment/input + documentation rendering
-npm run package       # خروجی: rtl-copilot-2.9.18.vsix
+npm run package       # خروجی: rtl-copilot-2.9.19.vsix
 ```
 
 مستقیم:
@@ -62,7 +62,7 @@ npm run package       # خروجی: rtl-copilot-2.9.18.vsix
 بررسی محتوای VSIX (باید `node_modules` و تست‌ها داخل بسته نباشند):
 
 ```bash
-unzip -l rtl-copilot-2.9.18.vsix
+unzip -l rtl-copilot-2.9.19.vsix
 ```
 
 ---
@@ -88,12 +88,12 @@ npx vsce publish --no-dependencies --allow-missing-repository
 
 ## ۶) انتشار فایل VSIX در GitHub Releases
 
-بعد از ادغام تغییرات در `main` و تأیید نسخهٔ `package.json`، tag `v2.9.18` را روی commit موردنظر بسازید و push کنید. گردش‌کار پس از تست، VSIX را می‌سازد و SHA-256 آن را به‌همراه فایل VSIX در Release قرار می‌دهد.
+بعد از ادغام تغییرات در `main` و تأیید نسخهٔ `package.json`، tag `v2.9.19` را روی commit موردنظر بسازید و push کنید. گردش‌کار پس از تست، VSIX را می‌سازد و SHA-256 آن را به‌همراه فایل VSIX در Release قرار می‌دهد.
 
 یا دستی از https://github.com/Noor-CRCIS/rtl-copilot/releases :
 
-1. `Draft a new release` → tag `v2.9.18` (تنها اگر انتشار خودکار tag را استفاده نمی‌کنید)
-2. آپلود `rtl-copilot-2.9.18.vsix`
+1. `Draft a new release` → tag `v2.9.19` (تنها اگر انتشار خودکار tag را استفاده نمی‌کنید)
+2. آپلود `rtl-copilot-2.9.19.vsix`
 3. ثبت SHA-256 در body ریلیز
 
 ---

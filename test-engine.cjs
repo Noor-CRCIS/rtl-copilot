@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const engine = require('./rtl-engine');
 
-assert.equal(engine.VERSION, '2.9.18');
+assert.equal(engine.VERSION, '2.9.19');
 
 const original = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src \'self\'\"></head><body></body></html>';
 const patched = engine.applyPatchToHtml(original);
@@ -370,17 +370,22 @@ assert.match(extensionSource, /const nextBundle = nativeEditorEnabled \? engine\
 assert.match(extensionSource, /const nativeRequired = options\.areas\.inputs && options\.areas\.promptInputs \|\| options\.areas\.editorsCode \|\| options\.areas\.editorComments/);
 assert.match(extensionSource, /let busy = false/);
 assert.match(extensionSource, /function executeTransaction\(transaction, enabled\)/);
-assert.match(extensionSource, /writeEntries\(transaction\.entries\)/);
+assert.match(extensionSource, /writeEntries\(\[\.\.\.backupEntries, \.\.\.transaction\.entries\]/);
 assert.match(extensionSource, /verifyTransaction\(transaction, enabled\)/);
-assert.doesNotMatch(extensionSource, /require\(['"]child_process['"]\)|\bexecFile(?:Sync)?\s*\(|\bspawn(?:Sync)?\s*\(|powershell|Start-Process|\.ps1/);
+assert.match(extensionSource, /require\('node:child_process'\)/);
+assert.match(extensionSource, /showWarningMessage\([\s\S]*?modal: true/);
+assert.match(extensionSource, /pkexec/);
+assert.match(extensionSource, /Start-Process[\s\S]*?RunAs/);
+assert.match(extensionSource, /privileged-write\.ps1/);
+assert.match(extensionSource, /privileged-write\.sh/);
+assert.match(extensionSource, /async function runElevatedWrite\(entries, appRoot\)/);
 assert.match(extensionSource, /fs\.renameSync\(tempPath, filePath\)/);
 assert.match(extensionSource, /\['EACCES', 'EPERM', 'EROFS'\]/);
 assert.match(extensionSource, /cleanProduct\.commit !== product\.data\.commit \|\| cleanProduct\.version !== product\.data\.version/);
 assert.doesNotMatch(extensionSource, /stageOfflineTransaction/);
-assert.doesNotMatch(extensionSource, /offline-patch\.ps1/);
 assert.doesNotMatch(extensionSource, /currentOperation/);
 assert.doesNotMatch(extensionSource, /operationStatus/);
 assert.equal(fs.existsSync(path.join(__dirname, 'offline-patch.ps1')), false);
 
 fs.rmSync(temp, { recursive: true, force: true });
-console.log('RTL_ENGINE_2_9_18_TESTS_OK');
+console.log('RTL_ENGINE_2_9_19_TESTS_OK');

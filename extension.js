@@ -2,7 +2,9 @@
 
 const vscode = require('vscode');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const { execFile } = require('node:child_process');
 const engine = require('./rtl-engine');
 
 const EXT_ID = 'rtlCopilot';
@@ -13,6 +15,8 @@ let outputChannel = null;
 let statusBarItem = null;
 let extensionContext = null;
 let busy = false;
+let elevatedWrite = false;
+let lastWriteContext = null;
 
 function log(message) {
     const line = `[${new Date().toTimeString().slice(0, 8)}] ${message}`;
@@ -182,21 +186,103 @@ function atomicWrite(filePath, content) {
     if (exists(tempPath)) fs.unlinkSync(tempPath);
 }
 
-function createBackup(filePath, sourceContent = null, refresh = false) {
+function backupEntry(filePath, sourceContent = null, refresh = false) {
     const backupPath = getBackupPath(filePath);
     if (!exists(backupPath)) {
         const content = sourceContent === null ? fs.readFileSync(filePath) : sourceContent;
-        writeEntries([{ path: backupPath, content }]);
-        return backupPath;
+        return { path: backupPath, content };
     }
     const current = sourceContent === null ? fs.readFileSync(filePath) : sourceContent;
     const backup = fs.readFileSync(backupPath);
     const currentBytes = Buffer.isBuffer(current) ? current : Buffer.from(current, 'utf8');
-    if (refresh && !currentBytes.equals(backup)) writeEntries([{ path: backupPath, content: currentBytes }]);
-    return backupPath;
+    return refresh && !currentBytes.equals(backup) ? { path: backupPath, content: currentBytes } : null;
 }
 
-function writeEntries(entries) {
+function isPermissionError(error) {
+    return ['EACCES', 'EPERM', 'EROFS'].includes(error && error.code)
+        || ['EACCES', 'EPERM', 'EROFS'].includes(error && error.cause && error.cause.code);
+}
+
+function execFileAsync(file, args, options) {
+    return new Promise((resolve, reject) => {
+        execFile(file, args, options, (error, stdout, stderr) => {
+            if (error) {
+                const detail = stderr && stderr.trim();
+                if (detail) error.message = `${error.message}: ${detail}`;
+                reject(error);
+            } else resolve(stdout);
+        });
+    });
+}
+
+async function runElevatedWrite(entries, appRoot) {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rtl-copilot-elevation-'));
+    const manifestPath = path.join(tempDir, 'write-manifest.json');
+    try {
+        const root = fs.realpathSync(appRoot);
+        const normalizedEntries = entries.map(entry => ({
+            path: path.resolve(entry.path),
+            operation: entry.operation || 'write',
+            content: entry.operation === 'delete'
+                ? ''
+                : (Buffer.isBuffer(entry.content) ? entry.content : Buffer.from(entry.content, 'utf8')).toString('base64'),
+        }));
+        if (process.platform === 'win32') {
+            fs.writeFileSync(manifestPath, JSON.stringify({ version: 1, entries: normalizedEntries }), { mode: 0o600 });
+            const helperPath = path.join(extensionContext.extensionPath, 'privileged-write.ps1');
+            const quotePowerShell = value => `'${value.replace(/'/g, "''")}'`;
+            const script = [
+                '$ErrorActionPreference = "Stop"',
+                `$helper = ${quotePowerShell(helperPath)}`,
+                `$manifest = ${quotePowerShell(manifestPath)}`,
+                `$tempDirectory = ${quotePowerShell(tempDir)}`,
+                `$root = ${quotePowerShell(root)}`,
+                '$administrators = [System.Security.Principal.SecurityIdentifier]::new("S-1-5-32-544")',
+                '$directoryAcl = Get-Acl -LiteralPath $tempDirectory',
+                '$directoryRule = New-Object System.Security.AccessControl.FileSystemAccessRule($administrators, "ReadAndExecute", "ContainerInherit,ObjectInherit", "None", "Allow")',
+                '$directoryAcl.SetAccessRule($directoryRule)',
+                'Set-Acl -LiteralPath $tempDirectory -AclObject $directoryAcl',
+                '$manifestAcl = Get-Acl -LiteralPath $manifest',
+                '$manifestRule = New-Object System.Security.AccessControl.FileSystemAccessRule($administrators, "Read", "Allow")',
+                '$manifestAcl.SetAccessRule($manifestRule)',
+                'Set-Acl -LiteralPath $manifest -AclObject $manifestAcl',
+                '$arguments = \'-NoProfile -ExecutionPolicy Bypass -File "\' + $helper + \'" -Manifest "\' + $manifest + \'" -Root "\' + $root + \'"\'',
+                '$process = Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -Verb RunAs -Wait -PassThru',
+                'exit $process.ExitCode',
+            ].join('\n');
+            await execFileAsync('powershell.exe', [
+                '-NoProfile',
+                '-NonInteractive',
+                '-EncodedCommand',
+                Buffer.from(script, 'utf16le').toString('base64'),
+            ], { windowsHide: true, timeout: 120000, maxBuffer: 1024 * 1024 });
+        } else if (process.platform === 'linux') {
+            const encodePath = value => Buffer.from(value, 'utf8').toString('base64');
+            const lines = [];
+            for (const entry of normalizedEntries) {
+                const operation = entry.operation === 'delete' ? 'DELETE' : 'WRITE';
+                lines.push(`${operation}\t${encodePath(entry.path)}\t${entry.content}`);
+            }
+            fs.writeFileSync(manifestPath, `${lines.join('\n')}\n`, { mode: 0o600 });
+            const helperPath = path.join(extensionContext.extensionPath, 'privileged-write.sh');
+            await execFileAsync('pkexec', ['/bin/bash', helperPath, manifestPath, root], {
+                windowsHide: true,
+                timeout: 120000,
+                maxBuffer: 1024 * 1024,
+            });
+        } else {
+            throw new Error(`درخواست دسترسی بالاتر در ${process.platform} پشتیبانی نمی‌شود.`);
+        }
+    } finally {
+        try { fs.rmSync(tempDir, { recursive: true, force: true }); }
+        catch (error) { log(`temporary elevation manifest cleanup failed: ${error.message}`); }
+    }
+}
+
+async function writeEntries(entries, appRoot) {
+    if (!entries.length) return;
+    lastWriteContext = { paths: entries.map(entry => path.resolve(entry.path)) };
+    if (elevatedWrite) return runElevatedWrite(entries, appRoot);
     for (const entry of entries) {
         try {
             if (entry.operation === 'delete') {
@@ -204,7 +290,9 @@ function writeEntries(entries) {
             } else atomicWrite(entry.path, entry.content);
         } catch (error) {
             if (['EACCES', 'EPERM', 'EROFS'].includes(error.code)) {
-                throw new Error(`نصب VS Code اجازهٔ نوشتن در ${entry.path} را نمی‌دهد. هیچ فرمان خارجی یا درخواست دسترسی مدیر اجرا نشد. (${error.code})`, { cause: error });
+                const permissionError = new Error(`نصب VS Code اجازهٔ نوشتن در ${entry.path} را نمی‌دهد. (${error.code})`, { cause: error });
+                permissionError.code = error.code;
+                throw permissionError;
             }
             throw error;
         }
@@ -251,6 +339,7 @@ function buildTransaction(htmlPath, enable) {
         entries.push({ path: productInfo.productPath, content: productContent });
     }
     if (enable) entries.push({ path: runtimePath, content: engine.buildRuntime(options) });
+    else if (exists(runtimePath)) entries.push({ path: runtimePath, operation: 'delete' });
     return { entries, htmlPath, htmlContent, runtimePath, productInfo, checksumResult, bundlePath, bundleContent, bundleBytes, bundleChecksum, bundleEnabled: nativeEditorEnabled, enable };
 }
 
@@ -269,9 +358,10 @@ function verifyTransaction(transaction, enabled) {
         if (product.checksums[transaction.bundleChecksum.key] !== engine.checksum(persisted)) throw new Error('checksum نهایی bundle تطبیق ندارد.');
     }
     if (enabled) new Function(fs.readFileSync(transaction.runtimePath, 'utf8'));
+    else if (exists(transaction.runtimePath)) throw new Error('فایل runtime پس از غیرفعال‌سازی حذف نشده است.');
 }
 
-function executeTransaction(transaction, enabled) {
+async function executeTransaction(transaction, enabled) {
     const originals = transaction.entries.map(entry => ({
         path: entry.path,
         existed: exists(entry.path),
@@ -279,17 +369,19 @@ function executeTransaction(transaction, enabled) {
     }));
     const refreshBackups = engine.markerState(originals[0].content.toString('utf8')) === 'absent'
         && (!transaction.bundlePath || engine.editorBridgeState(fs.readFileSync(transaction.bundlePath, 'utf8')) === 'absent');
-    for (const original of originals.filter(item => item.existed && item.path !== transaction.runtimePath)) {
-        createBackup(original.path, original.content, refreshBackups);
-    }
+    const backupEntries = originals
+        .filter(item => item.existed && item.path !== transaction.runtimePath)
+        .map(item => backupEntry(item.path, item.content, refreshBackups))
+        .filter(Boolean);
     try {
-        writeEntries(transaction.entries);
+        await writeEntries([...backupEntries, ...transaction.entries], transaction.productInfo.appBase);
         verifyTransaction(transaction, enabled);
     } catch (error) {
+        if (isPermissionError(error)) throw error;
         const rollbackEntries = [...originals].reverse().map(original => original.existed
             ? { path: original.path, content: original.content }
             : { path: original.path, operation: 'delete' });
-        try { writeEntries(rollbackEntries); } catch (rollbackError) { log(`rollback failed: ${rollbackError.message}`); }
+        try { await writeEntries(rollbackEntries, transaction.productInfo.appBase); } catch (rollbackError) { log(`rollback failed: ${rollbackError.message}`); }
         throw error;
     }
 }
@@ -335,11 +427,7 @@ async function doPatch(enable, quiet = false) {
     assertWritableInstallation(found.htmlPath);
     log(`target: ${found.htmlPath}`);
     const transaction = buildTransaction(found.htmlPath, enable);
-    executeTransaction(transaction, enable);
-    if (!enable && exists(transaction.runtimePath)) {
-        try { writeEntries([{ path: transaction.runtimePath, operation: 'delete' }]); }
-        catch (error) { log(`runtime cleanup failed: ${error.message}`); }
-    }
+    await executeTransaction(transaction, enable);
     await extensionContext.globalState.update(KEY_DISABLED, !enable);
     setStatusBar(enable);
     if (!quiet) await promptFullRestart(`${EXT_LABEL}: ${enable ? 'فعال' : 'غیرفعال'} شد.`);
@@ -349,14 +437,40 @@ async function doPatch(enable, quiet = false) {
 async function safeRun(action, label) {
     if (busy) return;
     busy = true;
+    lastWriteContext = null;
     log(`START ${label}`);
-    try { return await action(); }
-    catch (error) {
-        log(`ERROR ${label}: ${error.stack || error.message}`);
-        const choice = await vscode.window.showErrorMessage(`${EXT_LABEL}: ${error.message}`, 'Log');
-        if (choice === 'Log') outputChannel.show(true);
-        return false;
-    } finally { busy = false; log(`END ${label}`); }
+    try {
+        try { return await action(); }
+        catch (initialError) {
+            let error = initialError;
+            if (isPermissionError(error) && lastWriteContext && ['win32', 'linux'].includes(process.platform)) {
+                const targets = lastWriteContext.paths.map(target => `• ${target}`).join('\n');
+                const choice = await vscode.window.showWarningMessage(
+                    `${EXT_LABEL}: برای تغییر فایل‌های نصب VS Code دسترسی بالاتر لازم است.`,
+                    {
+                        modal: true,
+                        detail: `در صورت تأیید، ویندوز UAC یا احراز هویت لینوکس باز می‌شود. فقط فایل‌های زیر و پشتیبان‌های همین نصب تغییر می‌کنند:\n${targets}\n\nاگر درخواست سیستم‌عامل را رد کنید، هیچ مجوزی گرفته نمی‌شود و عملیات انجام نخواهد شد.`,
+                    },
+                    'تأیید و درخواست دسترسی',
+                );
+                if (choice === 'تأیید و درخواست دسترسی') {
+                    log(`requesting elevated write for ${lastWriteContext.paths.length} file(s)`);
+                    elevatedWrite = true;
+                    try { return await action(); }
+                    catch (elevationError) { error = elevationError; }
+                    finally { elevatedWrite = false; }
+                }
+            }
+            log(`ERROR ${label}: ${error.stack || error.message}`);
+            const choice = await vscode.window.showErrorMessage(`${EXT_LABEL}: ${error.message}`, 'Log');
+            if (choice === 'Log') outputChannel.show(true);
+            return false;
+        }
+    } finally {
+        elevatedWrite = false;
+        busy = false;
+        log(`END ${label}`);
+    }
 }
 
 const cmdEnable = () => safeRun(() => doPatch(true), 'enable');
@@ -389,10 +503,12 @@ function cmdBackup() {
         if (engine.markerState(html) !== 'absent' || (bundle && engine.editorBridgeState(bundle) !== 'absent')) {
             throw new Error('برای جلوگیری از backup آلوده، ابتدا پچ را غیرفعال کنید و سپس پشتیبان بگیرید.');
         }
-        createBackup(found.htmlPath, html, true);
+        const backupEntries = [backupEntry(found.htmlPath, html, true)];
         const product = findProductJson(found.htmlPath);
-        if (product) createBackup(product.productPath, fs.readFileSync(product.productPath, 'utf8'), true);
-        if (bundlePath) createBackup(bundlePath, bundle, true);
+        if (!product) throw new Error('product.json متناظر با workbench پیدا نشد.');
+        if (product) backupEntries.push(backupEntry(product.productPath, fs.readFileSync(product.productPath, 'utf8'), true));
+        if (bundlePath) backupEntries.push(backupEntry(bundlePath, bundle, true));
+        await writeEntries(backupEntries.filter(Boolean), product.appBase);
         vscode.window.showInformationMessage(`${EXT_LABEL}: پشتیبان HTML، bundle و product.json ذخیره شد.`);
     }, 'backup');
 }
@@ -412,7 +528,7 @@ function cmdFixChecksum() {
             ? engine.updateWorkbenchChecksum(updated.product, productInfo.appBase, bundlePath, bundle)
             : null;
         const productContent = `${JSON.stringify(bundleUpdated ? bundleUpdated.product : updated.product, null, 2)}\n`;
-        writeEntries([{ path: productInfo.productPath, content: productContent }]);
+        await writeEntries([{ path: productInfo.productPath, content: productContent }], productInfo.appBase);
         await promptFullRestart(`${EXT_LABEL}: checksum فایلهای Workbench بازسازی شد.`);
         return true;
     }, 'fixChecksum');
@@ -459,7 +575,7 @@ function cmdRestore() {
             ...(bundlePath && exists(bundleBackup) ? [{ path: bundlePath, content: fs.readFileSync(bundleBackup) }] : []),
             { path: runtimePath, operation: 'delete' },
         ];
-        writeEntries(restoreEntries);
+        await writeEntries(restoreEntries, product.appBase);
         await extensionContext.globalState.update(KEY_DISABLED, true);
         setStatusBar(false);
         await promptFullRestart(`${EXT_LABEL}: فایلهای اصلی بازگردانی شدند.`);
