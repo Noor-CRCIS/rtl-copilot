@@ -1,0 +1,32 @@
+# Node
+node_modules/
+*.vsix
+*.vsixmap
+
+# Build / tooling
+.vscode-test/
+.t/
+.rtl-test/
+__pycache__/
+*.pyc
+__pycache__/
+
+# Old local packages kept out of the repo
+download/
+okVersion/
+rtl-copilot/
+rtl-copilot-*.vsix
+
+# VS Code state
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor / secrets
+.env
+*.local.log
+
+# Release output
+release-*/

@@ -1,0 +1,72 @@
+name: Validate and package extension
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vsix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run regression tests
+        run: npm test
+      - name: Audit build dependencies
+        run: npm audit --audit-level=moderate
+      - name: Check extension syntax
+        run: |
+          node --check extension.js
+          node --check rtl-engine.js
+          node --check media/rtl-markdown-preview.js
+      - name: Check tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          expected="v$(node -p 'require("./package.json").version')"
+          if [ "$RELEASE_TAG" != "$expected" ]; then
+            echo "Tag $RELEASE_TAG does not match $expected" >&2
+            exit 1
+          fi
+      - name: Package VSIX
+        run: npm run package
+      - name: Store VSIX from CI
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtl-copilot-vsix
+          path: rtl-copilot-*.vsix
+          if-no-files-found: error
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: vsix
+    runs-on: ubuntu-latest
+    environment: github-release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: rtl-copilot-vsix
+      - name: Publish tagged GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          sha256sum rtl-copilot-*.vsix > SHA256SUMS
+          gh release create "$RELEASE_TAG" rtl-copilot-*.vsix SHA256SUMS \
+            --title "راست‌چین هوشمند نور $RELEASE_TAG" \
+            --generate-notes

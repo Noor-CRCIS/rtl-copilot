@@ -1,0 +1,449 @@
+{
+  "name": "rtl-copilot",
+  "displayName": "Noor RTL — VS Code, Copilot & AI Chat",
+  "description": "راست‌چین هوشمند نور برای فارسی و عربی در VS Code، GitHub Copilot و AI Chat؛ تنظیم مستقل ورودی‌ها، Markdown و کامنت‌های ادیتور.",
+  "version": "2.9.17",
+  "publisher": "rtl-tools",
+  "license": "MIT",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Noor-CRCIS/rtl-copilot.git"
+  },
+  "homepage": "https://github.com/Noor-CRCIS/rtl-copilot#readme",
+  "bugs": {
+    "url": "https://github.com/Noor-CRCIS/rtl-copilot/issues"
+  },
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ],
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "badges": [
+    {
+      "url": "https://img.shields.io/badge/version-2.9.17-orange.svg",
+      "href": "https://github.com/Noor-CRCIS/rtl-copilot",
+      "label": "version",
+      "description": "نسخهٔ افزونه"
+    },
+    {
+      "url": "https://img.shields.io/badge/License-MIT-green.svg",
+      "href": "https://choosealicense.com/licenses/mit/",
+      "label": "license",
+      "description": "مجوز MIT"
+    }
+  ],
+  "keywords": [
+    "rtl",
+    "vscode",
+    "copilot",
+    "ai chat",
+    "chat",
+    "agent",
+    "farsi",
+    "persian",
+    "arabic",
+    "bidi",
+    "direction",
+    "right-to-left",
+    "noor",
+    "noorsoft"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "markdown.markdownItPlugins": true,
+    "markdown.previewStyles": [
+      "./media/rtl-markdown-preview.css"
+    ],
+    "markdown.previewScripts": [
+      "./media/rtl-markdown-preview.js"
+    ],
+    "commands": [
+      {
+        "command": "rtlCopilot.enable",
+        "title": "✅ فعالسازی پچ RTL",
+        "category": "راست‌چین هوشمند نور"
+      },
+      {
+        "command": "rtlCopilot.disable",
+        "title": "❌ غیرفعالسازی پچ RTL",
+        "category": "راست‌چین هوشمند نور"
+      },
+      {
+        "command": "rtlCopilot.toggle",
+        "title": "🔄 تغییر وضعیت پچ RTL",
+        "category": "راست‌چین هوشمند نور"
+      },
+      {
+        "command": "rtlCopilot.status",
+        "title": "ℹ️ نمایش وضعیت پچ",
+        "category": "راست‌چین هوشمند نور"
+      },
+      {
+        "command": "rtlCopilot.configureAreas",
+        "title": "⚙️ فعال/غیرفعالکردن بخشهای RTL",
+        "category": "راست‌چین هوشمند نور"
+      },
+      {
+        "command": "rtlCopilot.reinstall",
+        "title": "🔁 نصب مجدد پچ",
+        "category": "راست‌چین هوشمند نور"
+      },
+      {
+        "command": "rtlCopilot.backup",
+        "title": "💾 پشتیبانگیری کامل",
+        "category": "راست‌چین هوشمند نور"
+      },
+      {
+        "command": "rtlCopilot.restore",
+        "title": "↩️ بازگرداندن کامل فایلهای اصلی",
+        "category": "راست‌چین هوشمند نور"
+      },
+      {
+        "command": "rtlCopilot.detectPath",
+        "title": "🔍 تشخیص مسیر Workbench",
+        "category": "راست‌چین هوشمند نور"
+      },
+      {
+        "command": "rtlCopilot.showInstructions",
+        "title": "📋 نمایش دستورالعمل",
+        "category": "راست‌چین هوشمند نور"
+      },
+      {
+        "command": "rtlCopilot.openLog",
+        "title": "📋 باز کردن Output Log",
+        "category": "راست‌چین هوشمند نور"
+      },
+      {
+        "command": "rtlCopilot.fixChecksum",
+        "title": "🛡️ بازسازی امن Checksum فایل Workbench",
+        "category": "راست‌چین هوشمند نور"
+      }
+    ],
+    "configuration": {
+      "title": "راست‌چین هوشمند نور",
+      "properties": {
+        "rtlCopilot.autoApply": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "بررسی خودکار وضعیت پچ هنگام راهاندازی؛ Startup فقط اطلاع میدهد و فایلهای داخلی را تغییر نمیدهد"
+        },
+        "rtlCopilot.selectors": {
+          "type": "array",
+          "default": [],
+          "scope": "application",
+          "items": {
+            "type": "string"
+          },
+          "description": "Selectorهای اضافی امن؛ مقادیر Workspace وارد Workbench نمیشوند."
+        },
+        "rtlCopilot.mode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "forceRtl"
+          ],
+          "default": "auto",
+          "scope": "application",
+          "description": "auto: فارسی راست و لاتین چپ؛ forceRtl: متن دارای حروف فارسی اجباری راست."
+        },
+        "rtlCopilot.useMutationObserver": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "پردازش محتوای پویا و پاسخهای Streaming"
+        },
+        "rtlCopilot.additionalCSS": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "description": "CSS پیشرفته از User Settings؛ تگ style/script رد میشود."
+        },
+        "rtlCopilot.notifyOnUpdate": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "اعلان بعد از نصب خودکار نسخه جدید پچ"
+        },
+        "rtlCopilot.workbenchHtmlPath": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "description": "مسیر دستی workbench.html یا workbench.esm.html"
+        },
+        "rtlCopilot.codePerLine": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "deprecationMessage": "از rtlCopilot.areas.editorsCode استفاده کنید.",
+          "description": "تنظیم قدیمی؛ Monaco بهطور پیشفرض تغییر نمیکند."
+        },
+        "rtlCopilot.fixInputDirection": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "deprecationMessage": "از rtlCopilot.areas.inputs استفاده کنید.",
+          "description": "تنظیم قدیمی؛ ورودی پرامپت اکنون با rtlCopilot.areas.inputs کنترل میشود."
+        },
+        "rtlCopilot.areas.chat": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "متن Chat، Copilot و Agent"
+        },
+        "rtlCopilot.areas.markdown": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Markdown رندرشده در Workbench"
+        },
+        "rtlCopilot.areas.markdownPreview": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "پیشنمایش فایلهای README و Markdown در Webview داخلی VS Code؛ بدون نیاز به نصب مجدد پچ"
+        },
+        "rtlCopilot.areas.lists": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "لیستهای بولت و شمارهدار با marker سمت صحیح"
+        },
+        "rtlCopilot.areas.tables": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "متن سلولهای جدول بدون وارونهکردن ستونها"
+        },
+        "rtlCopilot.areas.inputs": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "کنترل جهت ورودی‌ها و پرامپت؛ تشخیص خودکار مستقل با autoInputDirection به‌صورت پیش‌فرض روشن است. Ctrl+Shift چپ/راست انتخاب دستی جهت را ممکن می‌کند."
+        },
+        "rtlCopilot.areas.notifications": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "متن خطاها، اعلانها، دیالوگها و دکمههای متنی؛ ترتیب actionها دستنخورده میماند"
+        },
+        "rtlCopilot.areas.menus": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "برچسبهای متنی منو؛ آیکن و shortcut دستنخورده"
+        },
+        "rtlCopilot.areas.sidebar": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "برچسبهای Sidebar و Auxiliary Bar"
+        },
+        "rtlCopilot.areas.panel": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "برچسبهای متنی Panel"
+        },
+        "rtlCopilot.areas.statusBar": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "متن Status Bar"
+        },
+        "rtlCopilot.areas.quickPick": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Quick Pick و Command Palette"
+        },
+        "rtlCopilot.areas.breadcrumbs": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Breadcrumbs"
+        },
+        "rtlCopilot.areas.explorer": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "نامها و متنهای Explorer"
+        },
+        "rtlCopilot.areas.search": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "نتایج و پیامهای Search"
+        },
+        "rtlCopilot.areas.scm": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Source Control، گروهها و resourceها"
+        },
+        "rtlCopilot.areas.debug": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "متنهای Debug، Call Stack و Variables"
+        },
+        "rtlCopilot.areas.extensions": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "فهرست، توضیحات و پیامهای Extensions"
+        },
+        "rtlCopilot.areas.settings": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "عنوان، توضیح و پیامهای Settings"
+        },
+        "rtlCopilot.areas.welcome": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "صفحه Welcome و Getting Started"
+        },
+        "rtlCopilot.areas.problems": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "پیامها و جزئیات Problems"
+        },
+        "rtlCopilot.areas.comments": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Comments و Review Widget"
+        },
+        "rtlCopilot.areas.notebooks": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "برچسبها و Statusهای رابط Notebook؛ محتوای rendererهای خارجی محدودیت Webview دارد"
+        },
+        "rtlCopilot.areas.sessions": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "عنوان، توضیح و هدرهای لیست Sessions و Agent Sessions"
+        },
+        "rtlCopilot.areas.editorsCode": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "فعال‌سازی کنترل جهت ادیتور فایل: پیش‌فرض دستی با Ctrl+Shift چپ/راست. جهت خودکار فقط با autoEditorDirection روشن می‌شود."
+        },
+        "rtlCopilot.areas.editorComments": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "جهت خودکار فقط برای خطوط مستقل کامنت فارسی بر اساس توکن زبان Monaco؛ کد، رشته‌ها و کامنت انتهای خط کد دست‌نخورده می‌مانند. مستقل از editorsCode؛ نیازمند نصب مجدد پچ."
+        },
+        "rtlCopilot.areas.promptInputs": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "جهت ورودی پرامپت و نظر؛ زیرمجموعهٔ کلید inputs."
+        },
+        "rtlCopilot.areas.searchInputs": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "جهت ورودی‌های جستجو و Find/Replace؛ زیرمجموعهٔ کلید inputs."
+        },
+        "rtlCopilot.areas.settingsInputs": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "جهت ورودی‌های صفحهٔ Settings؛ زیرمجموعهٔ کلید inputs."
+        },
+        "rtlCopilot.areas.quickPickInputs": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "جهت ورودی Command Palette و Quick Open؛ زیرمجموعهٔ کلید inputs."
+        },
+        "rtlCopilot.areas.otherInputs": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "جهت سایر ورودی‌های متنی Workbench؛ فیلد رمز، عدد، URL و Webviewهای مستقل پوشش داده نمی‌شوند. زیرمجموعهٔ inputs."
+        },
+        "rtlCopilot.autoEditorDirection": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "جهت خودکار فقط در ادیتور فایل؛ پیش‌فرض خاموش. ورودی پرامپت تنظیم مستقل autoInputDirection دارد. نیازمند نصب مجدد پچ و بستن کامل VS Code است."
+        },
+        "rtlCopilot.autoInputDirection": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "جهت خودکار ورودی‌های پشتیبانی‌شده و پرامپت؛ پیش‌فرض روشن. در پرامپت Monaco جهت هر خط با اولین حرف فارسی یا لاتین تعیین و تا پاک‌شدن خط ثابت می‌ماند؛ ورودی خالی اجباری راست‌چین نمی‌شود. نیازمند نصب مجدد پچ و بستن کامل VS Code است."
+        },
+        "rtlCopilot.areas.terminal": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "آزمایشی: xterm؛ پیشفرض خاموش"
+        }
+      }
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "rtlCopilot.enable"
+        },
+        {
+          "command": "rtlCopilot.disable"
+        },
+        {
+          "command": "rtlCopilot.toggle"
+        },
+        {
+          "command": "rtlCopilot.status"
+        },
+        {
+          "command": "rtlCopilot.configureAreas"
+        },
+        {
+          "command": "rtlCopilot.reinstall"
+        },
+        {
+          "command": "rtlCopilot.backup"
+        },
+        {
+          "command": "rtlCopilot.restore"
+        },
+        {
+          "command": "rtlCopilot.detectPath"
+        },
+        {
+          "command": "rtlCopilot.openLog"
+        },
+        {
+          "command": "rtlCopilot.fixChecksum"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node test-engine.cjs && node test-native-direction.cjs && node test-comment-input.cjs && node test-docs.cjs",
+    "package": "vsce package --no-dependencies --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^4.0.0",
+    "marked": "18.1.0"
+  }
+}

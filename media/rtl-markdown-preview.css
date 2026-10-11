@@ -1,0 +1,37 @@
+/* Noor Persian RTL — built-in Markdown Preview */
+.markdown-body [data-rtlc-preview-dir="rtl"] {
+    direction: rtl;
+    text-align: right;
+    unicode-bidi: plaintext;
+}
+
+.markdown-body [data-rtlc-preview-dir="ltr"] {
+    direction: ltr;
+    text-align: left;
+    unicode-bidi: plaintext;
+}
+
+.markdown-body ul[data-rtlc-preview-dir],
+.markdown-body ol[data-rtlc-preview-dir] {
+    list-style-position: outside;
+    padding-inline-start: 1.6em;
+    padding-inline-end: 0;
+}
+
+.markdown-body table[data-rtlc-preview-table] {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+.markdown-body [data-rtlc-preview-tree] {
+    direction: ltr;
+    text-align: left;
+    unicode-bidi: isolate;
+    white-space: pre-wrap;
+}
+
+.markdown-body :is(pre, code, .vscode-code-block, .katex, .katex-display, math, svg) {
+    direction: ltr;
+    text-align: left;
+    unicode-bidi: normal;
+}
