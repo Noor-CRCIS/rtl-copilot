@@ -87,16 +87,20 @@ foreach ($entry in $document.entries) {
 }
 
 function Write-Atomic([string]$Target, [byte[]]$Bytes) {
-    $temporary = "$Target.rtl-elevated-$([Guid]::NewGuid().ToString('N'))"
+    $suffix = [Guid]::NewGuid().ToString('N')
+    $temporary = "$Target.rtl-elevated-$suffix"
+    $replacementBackup = "$Target.rtl-replaced-$suffix"
     try {
         [IO.File]::WriteAllBytes($temporary, $Bytes)
         if ([IO.File]::Exists($Target)) {
-            [IO.File]::Replace($temporary, $Target, $null)
+            [IO.File]::Replace($temporary, $Target, $replacementBackup)
+            [IO.File]::Delete($replacementBackup)
         } else {
             [IO.File]::Move($temporary, $Target)
         }
     } finally {
         if ([IO.File]::Exists($temporary)) { [IO.File]::Delete($temporary) }
+        if ([IO.File]::Exists($replacementBackup)) { [IO.File]::Delete($replacementBackup) }
     }
 }
 

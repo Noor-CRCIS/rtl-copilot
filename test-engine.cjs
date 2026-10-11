@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const engine = require('./rtl-engine');
 
-assert.equal(engine.VERSION, '2.9.20');
+assert.equal(engine.VERSION, '2.9.21');
 
 const original = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src \'self\'\"></head><body></body></html>';
 const patched = engine.applyPatchToHtml(original);
@@ -392,6 +392,9 @@ const windowsHelper = fs.readFileSync(path.join(__dirname, 'privileged-write.ps1
 assert.match(windowsHelper, /\[IO\.File\]::WriteAllText\(\$ErrorReport/);
 assert.match(windowsHelper, /Write verification failed/);
 assert.match(windowsHelper, /Rollback failed for/);
+assert.match(windowsHelper, /\$replacementBackup = "\$Target\.rtl-replaced-\$suffix"/);
+assert.match(windowsHelper, /\[IO\.File\]::Replace\(\$temporary, \$Target, \$replacementBackup\)/);
+assert.doesNotMatch(windowsHelper, /\[IO\.File\]::Replace\([^)]*\$null/);
 assert.match(extensionSource, /cleanProduct\.commit !== product\.data\.commit \|\| cleanProduct\.version !== product\.data\.version/);
 assert.doesNotMatch(extensionSource, /stageOfflineTransaction/);
 assert.doesNotMatch(extensionSource, /currentOperation/);
@@ -399,4 +402,4 @@ assert.doesNotMatch(extensionSource, /operationStatus/);
 assert.equal(fs.existsSync(path.join(__dirname, 'offline-patch.ps1')), false);
 
 fs.rmSync(temp, { recursive: true, force: true });
-console.log('RTL_ENGINE_2_9_20_TESTS_OK');
+console.log('RTL_ENGINE_2_9_21_TESTS_OK');
