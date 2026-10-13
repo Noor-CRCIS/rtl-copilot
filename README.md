@@ -94,6 +94,7 @@ code --install-extension rtl-copilot-2.9.21.vsix
 - 🌐 سامانه گفتگو هوشمند با احادیث: [**chattohadith.inoor.ir**](https://chattohadith.inoor.ir)
 - 🌐 سامانه گفتگو هوشمند با تفاسیر: [**chattotafsir.inoor.ir**](https://chattotafsir.inoor.ir)
 - 🌐 سامانه گفتگو هوشمند با آثار استاد شهید مرتضی مطهری: [**motahari.noorlib.ir**](https://motahari.noorlib.ir)
+- 🌐 سایت آزمایشگاه هوش: [ai.inoor.ir](https://ai.inoor.ir/)
 
 ▪️▫️▪️▫️▪️
 
