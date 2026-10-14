@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo.
-echo Noor Smart RTL v2.9.21 - Build Script (Windows)
+echo Noor Smart RTL v3.0.0 - Build Script (Windows)
 echo =============================================
 echo.
 
@@ -43,7 +43,7 @@ echo.
 echo [OK] VSIX ready!
 echo.
 echo Install:
-echo   code --install-extension rtl-copilot-2.9.21.vsix
+echo   code --install-extension rtl-copilot-3.0.0.vsix
 echo   or: Ctrl+Shift+X - Install from VSIX
 echo.
 pause

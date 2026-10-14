@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply or restore Persian RTL for VS Code 2.9.21 with selective integrity updates.
+"""Apply or restore Persian RTL for VS Code 3.0.0 with selective integrity updates.
 
 This standalone installer delegates patch generation to the packaged JavaScript
 engine so the VS Code extension and Windows installer cannot drift apart.
@@ -20,7 +20,7 @@ import tempfile
 import time
 from typing import Any, Final
 
-VERSION: Final = "2.9.21"
+VERSION: Final = "3.0.0"
 PATCH_START: Final = "<!-- RTL-COPILOT:START -->"
 PATCH_END: Final = "<!-- RTL-COPILOT:END -->"
 RUNTIME_NAME: Final = "rtl-copilot-runtime.js"

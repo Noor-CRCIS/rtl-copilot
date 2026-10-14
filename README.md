@@ -23,7 +23,7 @@
 
 ### روش دوم: نصب دستی از فایل VSIX
 
-1. **نصب افزونه:** فایل [نسخهٔ انتشار](https://github.com/Noor-CRCIS/rtl-copilot/releases) را دریافت کنید و از فرمان `Extensions: Install from VSIX...` در VS Code نصب کنید. نام بستهٔ این نسخه `rtl-copilot-2.9.21.vsix` است.
+1. **نصب افزونه:** فایل [نسخهٔ انتشار](https://github.com/Noor-CRCIS/rtl-copilot/releases) را دریافت کنید و از فرمان `Extensions: Install from VSIX...` در VS Code نصب کنید. نام بستهٔ این نسخه `rtl-copilot-3.0.0.vsix` است.
 2. **اعمال تغییرات رابط:** در Command Palette، فرمان «نصب مجدد پچ» از گروه «راست‌چین هوشمند نور» را اجرا کنید.
 3. **راه‌اندازی دوباره:** تمام پنجره‌های VS Code را کامل ببندید و برنامه را دوباره باز کنید.
 4. **استفاده در Remote SSH:** رابط کاربری روی رایانهٔ محلی نمایش داده می‌شود؛ نصب و اعمال پچ باید روی همان VS Code محلی انجام شود، نه فقط سرور.
@@ -42,10 +42,10 @@ npm test
 npm run package
 ```
 
-پس از موفقیت آزمون‌ها، فایل `rtl-copilot-2.9.21.vsix` در همین پوشه ساخته می‌شود. برای نصب بسته در VS Code:
+پس از موفقیت آزمون‌ها، فایل `rtl-copilot-3.0.0.vsix` در همین پوشه ساخته می‌شود. برای نصب بسته در VS Code:
 
 ```bash
-code --install-extension rtl-copilot-2.9.21.vsix
+code --install-extension rtl-copilot-3.0.0.vsix
 ```
 
 همچنین می‌توانید در VS Code فرمان `Extensions: Install from VSIX...` را اجرا و فایل ساخته‌شده را انتخاب کنید. راهنمای کامل انتشار در [راهنمای توسعه و انتشار](PUBLISHING.md) آمده است.
