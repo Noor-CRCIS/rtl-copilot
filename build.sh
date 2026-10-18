@@ -4,7 +4,7 @@ set -e
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
-echo "║ Noor Smart RTL v3.0.0 Build ║"
+echo "║ Noor Smart RTL v3.0.1 Build ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 

@@ -1,6 +1,11 @@
 <!-- Visible source entities &#x2067; (RLI) and &#x2069; (PDI) preserve text bidi isolation when the VS Code sanitizer strips dir attributes. -->
 <h1 align="right" dir="rtl">&#x2067;تغییرات راست‌چین هوشمند نور&#x2069;</h1>
+
 <p align="right" dir="rtl">&#x2067;تازه‌های <strong>Noor RTL — VS Code, Copilot &amp; AI Chat</strong>. راهنمای نصب و تنظیم‌ها در <a href="https://github.com/Noor-CRCIS/rtl-copilot/blob/main/README.md">معرفی افزونه</a> آمده است.&#x2069;</p>
+
+<h2 align="right" dir="rtl">&#x2067;نسخهٔ 3.0.1 — ۱۸ اکتبر ۲۰۲۶&#x2069;</h2>
+
+<p align="right" dir="rtl">&#x2067;پشتیبانی از نصب VS Code در macOS با مجوز مدیریت و امضای مجدد ad-hoc پس از پچ.&#x2069;</p>
 
 <h2 align="right" dir="rtl">&#x2067;نسخهٔ 3.0.0 — ۱۴ اکتبر ۲۰۲۶&#x2069;</h2>
 <p align="right" dir="rtl">&#x2067;شمارهٔ نسخه به شاخهٔ ماژور ۳ ارتقا یافت؛ رفتار و قابلیت‌های موجود افزونه در این انتشار تغییر نکرده‌اند.&#x2069;</p>

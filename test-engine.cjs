@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const engine = require('./rtl-engine');
 
-assert.equal(engine.VERSION, '3.0.0');
+assert.equal(engine.VERSION, '3.0.1');
 
 const original = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src \'self\'\"></head><body></body></html>';
 const patched = engine.applyPatchToHtml(original);
@@ -381,6 +381,8 @@ assert.match(extensionSource, /if \(error\.elevatedWriteHandled\) throw error/);
 assert.match(extensionSource, /permissionError\.appliedEntries = appliedEntries/);
 assert.match(extensionSource, /const appliedEntries = error\.appliedEntries \|\| entries/);
 assert.match(extensionSource, /pkexec/);
+assert.match(extensionSource, /osascript/);
+assert.match(extensionSource, /codesign/);
 assert.match(extensionSource, /Start-Process[\s\S]*?RunAs/);
 assert.match(extensionSource, /-ErrorReport/);
 assert.match(extensionSource, /privileged-write\.ps1/);

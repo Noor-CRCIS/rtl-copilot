@@ -57,9 +57,11 @@ function getInstallRoots() {
         add(process.env.ProgramFiles && path.join(process.env.ProgramFiles, 'Microsoft VS Code'), 'System Stable');
         add(process.env.ProgramFiles && path.join(process.env.ProgramFiles, 'Microsoft VS Code Insiders'), 'System Insiders');
     } else if (process.platform === 'darwin') {
+        add(path.resolve(path.dirname(process.execPath), '..', 'Resources', 'app'), 'execPath');
+        add(path.join(os.homedir(), 'Applications', 'Visual Studio Code.app', 'Contents', 'Resources', 'app'), 'User macOS Stable');
+        add(path.join(os.homedir(), 'Applications', 'Visual Studio Code - Insiders.app', 'Contents', 'Resources', 'app'), 'User macOS Insiders');
         add('/Applications/Visual Studio Code.app/Contents/Resources/app', 'macOS Stable');
         add('/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app', 'macOS Insiders');
-        add(path.resolve(path.dirname(process.execPath), '..', 'Resources', 'app'), 'execPath');
     } else {
         add(path.resolve(path.dirname(process.execPath), '..', 'lib', 'code', 'resources', 'app'), 'Linux Stable');
         add(path.resolve(path.dirname(process.execPath), '..', 'lib', 'code-insiders', 'resources', 'app'), 'Linux Insiders');
@@ -285,6 +287,24 @@ async function runElevatedWrite(entries, appRoot) {
                 error.elevatedWriteHandled = true;
                 throw error;
             }
+        } else if (process.platform === 'darwin') {
+            const encodePath = value => Buffer.from(value, 'utf8').toString('base64');
+            const lines = normalizedEntries.map(entry =>
+                `${entry.operation === 'delete' ? 'DELETE' : 'WRITE'}\t${encodePath(entry.path)}\t${entry.content}`);
+            fs.writeFileSync(manifestPath, `${lines.join('\n')}\n`, { mode: 0o600 });
+            if (!path.resolve(root, '..', '..', '..').endsWith('.app')) {
+                throw new Error('مسیر نصب macOS باید داخل بستهٔ .app باشد.');
+            }
+            const helperPath = path.join(extensionContext.extensionPath, 'privileged-write.sh');
+            const script = 'do shell script ("/bin/bash " & ' + [helperPath, manifestPath, root]
+                .map(value => `quoted form of ${JSON.stringify(value)}`).join(' & " " & ') +
+                ') with administrator privileges';
+            try {
+                await execFileAsync('osascript', ['-e', script], { timeout: 120000, maxBuffer: 1024 * 1024 });
+            } catch (error) {
+                error.elevatedWriteHandled = true;
+                throw error;
+            }
         } else {
             throw new Error(`درخواست دسترسی بالاتر در ${process.platform} پشتیبانی نمی‌شود.`);
         }
@@ -312,6 +332,16 @@ async function writeEntries(entries, appRoot) {
                 permissionError.appliedEntries = appliedEntries;
                 throw permissionError;
             }
+            error.appliedEntries = appliedEntries;
+            throw error;
+        }
+    }
+    if (process.platform === 'darwin') {
+        const bundle = path.resolve(appRoot, '..', '..', '..');
+        if (!bundle.endsWith('.app')) throw new Error('مسیر نصب macOS باید داخل بستهٔ .app باشد.');
+        try {
+            await execFileAsync('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', '--preserve-metadata=entitlements,requirements,flags,runtime', bundle], { timeout: 120000 });
+        } catch (error) {
             error.appliedEntries = appliedEntries;
             throw error;
         }
@@ -471,7 +501,7 @@ async function safeRun(action, label) {
         try { return await action(); }
         catch (initialError) {
             let error = initialError;
-            if (isPermissionError(error) && lastWriteContext && ['win32', 'linux'].includes(process.platform)) {
+            if (isPermissionError(error) && lastWriteContext && ['win32', 'linux', 'darwin'].includes(process.platform)) {
                 const targets = lastWriteContext.paths.map(target => `• ${target}`).join('\n');
                 log(`requesting one elevated transaction for ${lastWriteContext.paths.length} file(s):\n${targets}`);
                 elevatedWrite = true;

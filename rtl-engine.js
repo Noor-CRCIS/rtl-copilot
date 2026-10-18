@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const path = require('path');
 
-const VERSION = '3.0.0';
+const VERSION = '3.0.1';
 const PATCH_START = '<!-- RTL-COPILOT:START -->';
 const PATCH_END = '<!-- RTL-COPILOT:END -->';
 const RUNTIME_NAME = 'rtl-copilot-runtime.js';

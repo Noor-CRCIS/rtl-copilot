@@ -11,6 +11,17 @@ permissions:
   contents: read
 
 jobs:
+  macos-build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node test-engine.cjs && node test-native-direction.cjs && node test-comment-input.cjs && node test-docs.cjs && bash -n privileged-write.sh
+      - run: npm run package
   vsix:
     runs-on: ubuntu-latest
     steps:

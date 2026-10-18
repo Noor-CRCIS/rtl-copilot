@@ -1,6 +1,6 @@
 # راهنمای انتشار — راست‌چین هوشمند نور
 
-> **برای GitHub سازمان نور:** نشانی `/orgs/Noor-CRCIS/dashboard` صفحهٔ مدیریت خصوصی سازمان است، نه مخزن پروژه. مخزن پیشنهادی [`Noor-CRCIS/rtl-copilot`](https://github.com/Noor-CRCIS/rtl-copilot) باید توسط فرد مجاز ساخته شود؛ تا آن زمان پیوندهای مخزن ممکن است 404 باشند. پوشهٔ `latest/` هنوز مخزن Git نیست و این تغییرات push نشده‌اند.
+> مخزن پروژه: [`Noor-CRCIS/rtl-copilot`](https://github.com/Noor-CRCIS/rtl-copilot).
 
 ## آماده‌سازی مخزن سازمان
 
@@ -10,7 +10,7 @@
 
 ## CI و انتشار GitHub
 
-گردش‌کار واقعی در [`.github/workflows/extension.yml`](.github/workflows/extension.yml) تعریف شده است: روی `main` و pull request آزمون و بسته‌بندی اجرا می‌شود، و با push کردن tag منطبق با نسخهٔ `package.json` (مثلاً `v3.0.0`) پس از آزمون‌ها، VSIX و `SHA256SUMS` در GitHub Release منتشر می‌شوند. انتشار Marketplace خودکار نیست. دسترسی GitHub Actions برای ساخت Release باید در سازمان مجاز باشد؛ برای محیط `github-release` بازبین لازم تعیین کنید و ایجاد tagهای `v*` را محدود کنید.
+گردش‌کار واقعی در [`.github/workflows/extension.yml`](.github/workflows/extension.yml) تعریف شده است: روی `main` و pull request آزمون و بسته‌بندی اجرا می‌شود، و با push کردن tag منطبق با نسخهٔ `package.json` (مثلاً `v3.0.1`) پس از آزمون‌ها، VSIX و `SHA256SUMS` در GitHub Release منتشر می‌شوند. انتشار Marketplace خودکار نیست. دسترسی GitHub Actions برای ساخت Release باید در سازمان مجاز باشد؛ برای محیط `github-release` بازبین لازم تعیین کنید و ایجاد tagهای `v*` را محدود کنید.
 
 این افزونه فایل‌های داخلی VS Code را تغییر می‌دهد؛ محدودیت‌ها و هشدارهای یکپارچگی README را بررسی کنید. برای بسته‌بندی محلی با Node.js 22 از `npm ci`، `npm test` و `npm run package` استفاده کنید. `apply_patch.py` ابزار مستقل است و در Git می‌ماند اما در VSIX گنجانده نمی‌شود. انتشار Marketplace فرآیندی جداگانه است؛ راهنمای رسمی: [Publishing Extensions](https://code.visualstudio.com/api/working-with-extensions/publishing-extension). توکن‌ها را در مخزن قرار ندهید.
 
@@ -88,11 +88,11 @@ npx vsce publish --no-dependencies --allow-missing-repository
 
 ## ۶) انتشار فایل VSIX در GitHub Releases
 
-بعد از ادغام تغییرات در `main` و تأیید نسخهٔ `package.json`، tag `v3.0.0` را روی commit موردنظر بسازید و push کنید. گردش‌کار پس از تست، VSIX را می‌سازد و SHA-256 آن را به‌همراه فایل VSIX در Release قرار می‌دهد.
+بعد از ادغام تغییرات در `main` و تأیید نسخهٔ `package.json`، tag `v3.0.1` را روی commit موردنظر بسازید و push کنید. گردش‌کار پس از تست، VSIX را می‌سازد و SHA-256 آن را به‌همراه فایل VSIX در Release قرار می‌دهد.
 
 یا دستی از https://github.com/Noor-CRCIS/rtl-copilot/releases :
 
-1. `Draft a new release` → tag `v3.0.0` (تنها اگر انتشار خودکار tag را استفاده نمی‌کنید)
+1. `Draft a new release` → tag `v3.0.1` (تنها اگر انتشار خودکار tag را استفاده نمی‌کنید)
 2. آپلود `rtl-copilot-3.0.0.vsix`
 3. ثبت SHA-256 در body ریلیز
 
