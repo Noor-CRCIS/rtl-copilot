@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const path = require('path');
 
-const VERSION = '3.0.1';
+const VERSION = '3.1.0';
 const PATCH_START = '<!-- RTL-COPILOT:START -->';
 const PATCH_END = '<!-- RTL-COPILOT:END -->';
 const RUNTIME_NAME = 'rtl-copilot-runtime.js';
@@ -159,11 +159,22 @@ function normalizeOptions(raw = {}) {
     const additionalCSS = typeof raw.additionalCSS === 'string' && !/<\/?(?:style|script)\b/i.test(raw.additionalCSS)
         ? raw.additionalCSS.slice(0, 20000)
         : '';
+    const fontRaw = raw.font && typeof raw.font === 'object' ? raw.font : {};
+    const family = typeof fontRaw.family === 'string' ? fontRaw.family.trim().slice(0, 200) : '';
+    const size = typeof fontRaw.size === 'number' && fontRaw.size >= 7 && fontRaw.size <= 96 ? fontRaw.size : 0;
+    const lineHeight = typeof fontRaw.lineHeight === 'number' && fontRaw.lineHeight >= 1 && fontRaw.lineHeight <= 4 ? fontRaw.lineHeight : 0;
+    const fontEnabled = fontRaw.enabled !== false && (Boolean(family) || size > 0 || lineHeight > 0);
     return {
         mode: raw.mode === 'forceRtl' ? 'forceRtl' : 'auto',
         observe: raw.observe !== false,
         autoEditorDirection: raw.autoEditorDirection === true,
         autoInputDirection: raw.autoInputDirection !== false,
+        font: {
+            enabled: fontEnabled,
+            family,
+            size,
+            lineHeight,
+        },
         areas,
         customSelectors,
         additionalCSS,
@@ -186,6 +197,18 @@ function buildCss(rawOptions = {}) {
         ? `${generic.join(',\n')}{unicode-bidi:plaintext;text-align:start;} `
         : '';
     const chunks = [`/* RTL-COPILOT ${VERSION}: semantic workbench RTL */`, contentRule];
+
+    if (options.font.enabled) {
+        const fontDecls = [];
+        if (options.font.family) fontDecls.push(`font-family:${options.font.family}!important`);
+        if (options.font.size) fontDecls.push(`font-size:${options.font.size}px!important`);
+        if (options.font.lineHeight) fontDecls.push(`line-height:${options.font.lineHeight}!important`);
+        if (fontDecls.length) {
+            const fontTargets = [...generic,
+                ...(options.areas.inputs ? AREA_DEFINITIONS.inputs.selectors.filter(s => !s.includes('.monaco-editor')) : [])];
+            chunks.push(`/* RTL-COPILOT font: user-selected font for RTL chat */\n${[...new Set(fontTargets)].join(',\n')}{${fontDecls.join(';')}}`);
+        }
+    }
 
     if (options.areas.lists) {
         chunks.push(`${AREA_DEFINITIONS.lists.selectors.join(',\n')}{list-style-position:outside!important;padding-inline-start:1.6em!important;padding-inline-end:0!important;unicode-bidi:embed;text-align:start;}`);

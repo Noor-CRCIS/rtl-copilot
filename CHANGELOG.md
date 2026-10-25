@@ -3,6 +3,11 @@
 
 <p align="right" dir="rtl">&#x2067;تازه‌های <strong>Noor RTL — VS Code, Copilot &amp; AI Chat</strong>. راهنمای نصب و تنظیم‌ها در <a href="https://github.com/Noor-CRCIS/rtl-copilot/blob/main/README.md">معرفی افزونه</a> آمده است.&#x2069;</p>
 
+<h2 align="right" dir="rtl">&#x2067;نسخهٔ 3.1.0 — ۲۵ اکتبر ۲۰۲۶&#x2069;</h2>
+<p align="right" dir="rtl">&#x2067;انتخاب فونت چت از فونت‌های نصب‌شدهٔ سیستم (فرمان «انتخاب فونت چت» و تنظیم‌های `rtlCopilot.font.*`)؛ بلاک‌های کد همیشه فونت ادیتور را حفظ می‌کنند.&#x2069;</p>
+<p align="right" dir="rtl">&#x2067;پاک‌سازی خودکار هنگام حذف افزونه: hook وابسته به uninstall فایل‌های Workbench را به حالت اولیه بازمی‌گرداند و checksum را همگام می‌کند.&#x2069;</p>
+<p align="right" dir="rtl">&#x2067;بومی‌سازی: منیفست و پیام‌های زمان اجرا به ساختار nls و l10n منتقل شدند (package.nls.* و l10n/bundle.l10n.fa.json).&#x2069;</p>
+
 <h2 align="right" dir="rtl">&#x2067;نسخهٔ 3.0.1 — ۱۸ اکتبر ۲۰۲۶&#x2069;</h2>
 
 <p align="right" dir="rtl">&#x2067;پشتیبانی از نصب VS Code در macOS با مجوز مدیریت و امضای مجدد ad-hoc پس از پچ.&#x2069;</p>

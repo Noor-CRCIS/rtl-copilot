@@ -6,6 +6,7 @@ const os = require('os');
 const path = require('path');
 const { execFile } = require('node:child_process');
 const engine = require('./rtl-engine');
+const fonts = require('./fonts');
 
 const EXT_ID = 'rtlCopilot';
 const EXT_LABEL = 'راست‌چین هوشمند نور';
@@ -166,6 +167,12 @@ function patchOptions() {
         observe: globalSetting('useMutationObserver', true),
         autoEditorDirection: globalSetting('autoEditorDirection', false),
         autoInputDirection: globalSetting('autoInputDirection', true),
+        font: {
+            enabled: globalSetting('font.enabled', false),
+            family: globalSetting('font.family', ''),
+            size: globalSetting('font.size', 14),
+            lineHeight: globalSetting('font.lineHeight', 0),
+        },
         customSelectors: globalSetting('selectors', []),
         additionalCSS: globalSetting('additionalCSS', ''),
         areas,
@@ -644,6 +651,42 @@ async function cmdConfigureAreas() {
     vscode.window.showInformationMessage(`${EXT_LABEL}: بخش ${selected.name} ${!current ? 'فعال' : 'غیرفعال'} شد. دستور «نصب مجدد پچ» را اجرا کنید.`);
 }
 
+async function cmdSelectFont() {
+    let families = [];
+    await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t('جستجوی فونتهای نصبشده…') },
+        async () => { families = await fonts.listInstalledFonts(); }
+    );
+    const cfg = vscode.workspace.getConfiguration(EXT_ID);
+    const current = (cfg.get('font.family', '') || '').trim();
+    const items = [
+        { label: '$(close) ' + vscode.l10n.t('حالت پیشفرض (فونت ادیتور)'), description: current ? '' : vscode.l10n.t('فعلی'), reset: true },
+        ...(current ? [{ label: '$(check) ' + current, description: vscode.l10n.t('فعلی'), family: current }] : []),
+        ...families.map(family => ({ label: family, description: family === current ? vscode.l10n.t('فعلی') : undefined, family })),
+    ];
+    const picked = await vscode.window.showQuickPick(items, {
+        placeHolder: vscode.l10n.t('فونت فارسی/لاتین برای چت RTL را انتخاب کنید…'),
+        matchOnDescription: true,
+    });
+    if (!picked) return;
+    const target = vscode.ConfigurationTarget.Global;
+    if (picked.reset) {
+        await cfg.update('font.family', '', target);
+        await cfg.update('font.enabled', false, target);
+    } else {
+        await cfg.update('font.family', picked.family, target);
+        await cfg.update('font.enabled', true, target);
+    }
+    const choice = await vscode.window.showInformationMessage(
+        vscode.l10n.t('فونت چت بهروزرسانی شد. برای اعمال، پچ را دوباره نصب کنید.'),
+        vscode.l10n.t('نصب مجدد')
+    );
+    if (choice === vscode.l10n.t('نصب مجدد')) {
+        const ok = await safeRun(() => doPatch(true), 'reinstall-after-font');
+        if (ok) await promptFullRestart(vscode.l10n.t('پچ برای فونت جدید چت بهروزرسانی شد.'));
+    }
+}
+
 function showDiagnostics() {
     const found = findWorkbenchHtml();
     const lines = [
@@ -713,6 +756,7 @@ function activate(context) {
         restore: cmdRestore,
         fixChecksum: cmdFixChecksum,
         configureAreas: cmdConfigureAreas,
+        selectFont: cmdSelectFont,
     };
     for (const [name, handler] of Object.entries(commands)) {
         context.subscriptions.push(vscode.commands.registerCommand(`${EXT_ID}.${name}`, handler));

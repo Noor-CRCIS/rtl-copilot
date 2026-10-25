@@ -2,7 +2,7 @@
   "name": "rtl-copilot",
   "displayName": "Noor RTL — VS Code, Copilot & AI Chat",
   "description": "راست‌چین هوشمند نور برای فارسی و عربی در VS Code، GitHub Copilot و AI Chat؛ تنظیم مستقل ورودی‌ها، Markdown و کامنت‌های ادیتور.",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "publisher": "Noor-CRCIS",
   "license": "MIT",
   "icon": "icon.png",
@@ -69,67 +69,72 @@
     "commands": [
       {
         "command": "rtlCopilot.enable",
-        "title": "✅ فعالسازی پچ RTL",
-        "category": "راست‌چین هوشمند نور"
+        "title": "%rtlCopilot.command.enable%",
+        "category": "%rtlCopilot.category%"
       },
       {
         "command": "rtlCopilot.disable",
-        "title": "❌ غیرفعالسازی پچ RTL",
-        "category": "راست‌چین هوشمند نور"
+        "title": "%rtlCopilot.command.disable%",
+        "category": "%rtlCopilot.category%"
       },
       {
         "command": "rtlCopilot.toggle",
-        "title": "🔄 تغییر وضعیت پچ RTL",
-        "category": "راست‌چین هوشمند نور"
+        "title": "%rtlCopilot.command.toggle%",
+        "category": "%rtlCopilot.category%"
       },
       {
         "command": "rtlCopilot.status",
-        "title": "ℹ️ نمایش وضعیت پچ",
-        "category": "راست‌چین هوشمند نور"
+        "title": "%rtlCopilot.command.status%",
+        "category": "%rtlCopilot.category%"
       },
       {
         "command": "rtlCopilot.configureAreas",
-        "title": "⚙️ فعال/غیرفعالکردن بخشهای RTL",
-        "category": "راست‌چین هوشمند نور"
+        "title": "%rtlCopilot.command.configureAreas%",
+        "category": "%rtlCopilot.category%"
+      },
+      {
+        "command": "rtlCopilot.selectFont",
+        "title": "%rtlCopilot.command.selectFont%",
+        "category": "%rtlCopilot.category%"
       },
       {
         "command": "rtlCopilot.reinstall",
-        "title": "🔁 نصب مجدد پچ",
-        "category": "راست‌چین هوشمند نور"
+        "title": "%rtlCopilot.command.reinstall%",
+        "category": "%rtlCopilot.category%"
       },
       {
         "command": "rtlCopilot.backup",
-        "title": "💾 پشتیبانگیری کامل",
-        "category": "راست‌چین هوشمند نور"
+        "title": "%rtlCopilot.command.backup%",
+        "category": "%rtlCopilot.category%"
       },
       {
         "command": "rtlCopilot.restore",
-        "title": "↩️ بازگرداندن کامل فایلهای اصلی",
-        "category": "راست‌چین هوشمند نور"
+        "title": "%rtlCopilot.command.restore%",
+        "category": "%rtlCopilot.category%"
       },
       {
         "command": "rtlCopilot.detectPath",
-        "title": "🔍 تشخیص مسیر Workbench",
-        "category": "راست‌چین هوشمند نور"
+        "title": "%rtlCopilot.command.detectPath%",
+        "category": "%rtlCopilot.category%"
       },
       {
         "command": "rtlCopilot.showInstructions",
-        "title": "📋 نمایش دستورالعمل",
-        "category": "راست‌چین هوشمند نور"
+        "title": "%rtlCopilot.command.showInstructions%",
+        "category": "%rtlCopilot.category%"
       },
       {
         "command": "rtlCopilot.openLog",
-        "title": "📋 باز کردن Output Log",
-        "category": "راست‌چین هوشمند نور"
+        "title": "%rtlCopilot.command.openLog%",
+        "category": "%rtlCopilot.category%"
       },
       {
         "command": "rtlCopilot.fixChecksum",
-        "title": "🛡️ بازسازی امن Checksum فایل Workbench",
-        "category": "راست‌چین هوشمند نور"
+        "title": "%rtlCopilot.command.fixChecksum%",
+        "category": "%rtlCopilot.category%"
       }
     ],
     "configuration": {
-      "title": "راست‌چین هوشمند نور",
+      "title": "%rtlCopilot.configuration.title%",
       "properties": {
         "rtlCopilot.autoApply": {
           "type": "boolean",
@@ -179,6 +184,34 @@
           "default": "",
           "scope": "application",
           "description": "مسیر دستی workbench.html یا workbench.esm.html"
+        },
+        "rtlCopilot.font.enabled": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "%rtlCopilot.cfg.font.enabled%"
+        },
+        "rtlCopilot.font.family": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "markdownDescription": "%rtlCopilot.cfg.font.family.md%"
+        },
+        "rtlCopilot.font.size": {
+          "type": "number",
+          "default": 14,
+          "minimum": 9,
+          "maximum": 96,
+          "scope": "application",
+          "description": "%rtlCopilot.cfg.font.size%"
+        },
+        "rtlCopilot.font.lineHeight": {
+          "type": "number",
+          "default": 0,
+          "minimum": 1,
+          "maximum": 4,
+          "scope": "application",
+          "description": "%rtlCopilot.cfg.font.lineHeight%"
         },
         "rtlCopilot.codePerLine": {
           "type": "boolean",
@@ -418,6 +451,9 @@
           "command": "rtlCopilot.configureAreas"
         },
         {
+          "command": "rtlCopilot.selectFont"
+        },
+        {
           "command": "rtlCopilot.reinstall"
         },
         {
@@ -439,8 +475,9 @@
     }
   },
   "scripts": {
-    "test": "node test-engine.cjs && node test-native-direction.cjs && node test-comment-input.cjs && node test-privileged-write.cjs && node test-docs.cjs",
-    "package": "vsce package --no-dependencies --allow-missing-repository"
+    "test": "node test-engine.cjs && node test-native-direction.cjs && node test-comment-input.cjs && node test-privileged-write.cjs && node test-docs.cjs && node test-fonts-uninstall.cjs",
+    "package": "vsce package --no-dependencies --allow-missing-repository",
+    "vscode:uninstall": "node ./uninstall.js"
   },
   "devDependencies": {
     "@vscode/vsce": "^4.0.0",

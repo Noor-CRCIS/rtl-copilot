@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const engine = require('./rtl-engine');
 
-assert.equal(engine.VERSION, '3.0.1');
+assert.equal(engine.VERSION, '3.1.0');
 
 const original = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src \'self\'\"></head><body></body></html>';
 const patched = engine.applyPatchToHtml(original);

@@ -1,0 +1,21 @@
+{
+	"rtlCopilot.category": "راست‌چین هوشمند نور",
+	"rtlCopilot.configuration.title": "راست‌چین هوشمند نور",
+	"rtlCopilot.command.enable": "✅ فعال‌سازی پچ RTL",
+	"rtlCopilot.command.disable": "❌ غیرفعال‌سازی پچ RTL",
+	"rtlCopilot.command.toggle": "🔄 تغییر وضعیت پچ RTL",
+	"rtlCopilot.command.status": "ℹ️ نمایش وضعیت پچ",
+	"rtlCopilot.command.configureAreas": "⚙️ فعال/غیرفعال‌کردن بخش‌های RTL",
+	"rtlCopilot.command.selectFont": "🅰️ انتخاب فونت چت…",
+	"rtlCopilot.command.reinstall": "🔁 نصب مجدد پچ",
+	"rtlCopilot.command.backup": "💾 پشتیبان‌گیری کامل",
+	"rtlCopilot.command.restore": "↩️ بازگرداندن کامل فایل‌های اصلی",
+	"rtlCopilot.command.detectPath": "🔍 تشخیص مسیر Workbench",
+	"rtlCopilot.command.showInstructions": "📋 نمایش دستورالعمل",
+	"rtlCopilot.command.openLog": "📋 باز کردن Output Log",
+	"rtlCopilot.command.fixChecksum": "🛡️ بازسازی امن Checksum فایل Workbench",
+	"rtlCopilot.cfg.font.enabled": "اعمال فونت انتخابی (فام، اندازه و فاصله خطوط) به چت، Markdown و پنل‌های AI. نیازمند نصب مجدد پچ.",
+	"rtlCopilot.cfg.font.family.md": "فام فونت فارسی/لاتین برای چت RTL و متن Markdown. **بلاک‌های کد همیشه فونت ادیتور را حفظ می‌کنند.** برای حالت پیش‌فرض خالی بگذارید. با فرمان زیر می‌توانید از بین فونت‌های نصب‌شده انتخاب کنید.\n\n[🅰️ انتخاب از فونت‌های نصب‌شده](command:rtlCopilot.selectFont)",
+	"rtlCopilot.cfg.font.size": "اندازه فونت (پیکسل) برای چت RTL و متن Markdown؛ `0` یعنی حفظ حالت پیش‌فرض.",
+	"rtlCopilot.cfg.font.lineHeight": "ضریب فاصله خطوط (۱ تا ۴) برای چت RTL و متن Markdown؛ `0` یعنی حفظ حالت پیش‌فرض."
+}

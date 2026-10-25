@@ -1,0 +1,21 @@
+{
+	"rtlCopilot.category": "Noor Smart RTL",
+	"rtlCopilot.configuration.title": "Noor Smart RTL",
+	"rtlCopilot.command.enable": "✅ Enable RTL patch",
+	"rtlCopilot.command.disable": "❌ Disable RTL patch",
+	"rtlCopilot.command.toggle": "🔄 Toggle RTL patch",
+	"rtlCopilot.command.status": "ℹ️ Show patch status",
+	"rtlCopilot.command.configureAreas": "⚙️ Enable/disable RTL areas",
+	"rtlCopilot.command.selectFont": "🅰️ Select chat font…",
+	"rtlCopilot.command.reinstall": "🔁 Reinstall patch",
+	"rtlCopilot.command.backup": "💾 Full backup",
+	"rtlCopilot.command.restore": "↩️ Restore original files",
+	"rtlCopilot.command.detectPath": "🔍 Detect Workbench path",
+	"rtlCopilot.command.showInstructions": "📋 Show instructions",
+	"rtlCopilot.command.openLog": "📋 Open Output Log",
+	"rtlCopilot.command.fixChecksum": "🛡️ Safely rebuild Workbench file checksum",
+	"rtlCopilot.cfg.font.enabled": "Apply the selected font (family/size/line spacing) to RTL chat, Markdown and AI panels.",
+	"rtlCopilot.cfg.font.family.md": "Persian/Latin font family for RTL chat and Markdown text. **Code blocks always keep the editor font.** Leave empty to keep the default. You can pick one from your installed fonts with the command below.\n\n[🅰️ Choose from installed fonts](command:rtlCopilot.selectFont)",
+	"rtlCopilot.cfg.font.size": "Font size (px) for RTL chat and Markdown text. `0` = keep the default.",
+	"rtlCopilot.cfg.font.lineHeight": "Line height multiplier (1–4) for RTL chat and Markdown text. `0` = keep the default."
+}
