@@ -1,6 +1,6 @@
 'use strict';
 
-// test-fonts-uninstall.cjs — validates the v3.1.0 additions:
+// test-fonts-uninstall.cjs — validates the v3.1.x additions:
 //  1. manifest localization (package.nls.json / package.nls.fa.json) resolves every %key%
 //  2. fonts.js helpers rank/choose Persian fonts correctly
 //  3. uninstall.js restoreOne fully reverts a patched workbench + re-syncs checksum
@@ -18,7 +18,7 @@ const ROOT = __dirname;
 /* ---------- 1. Manifest localization ---------- */
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
-assert.equal(manifest.version, '3.1.0', 'extension version must be 3.1.0');
+assert.equal(manifest.version, '3.1.1', 'extension version must be 3.1.1');
 assert.equal(manifest.scripts['vscode:uninstall'], 'node ./uninstall.js', 'vscode:uninstall hook must be registered');
 
 const nlsEn = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.nls.json'), 'utf8'));

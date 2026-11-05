@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const engine = require('./rtl-engine');
 
-assert.equal(engine.VERSION, '3.1.0');
+assert.equal(engine.VERSION, '3.1.1');
 
 const original = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src \'self\'\"></head><body></body></html>';
 const patched = engine.applyPatchToHtml(original);
@@ -306,11 +306,15 @@ const previewScript = fs.readFileSync(path.join(__dirname, 'media', 'rtl-markdow
 new vm.Script(previewScript, { filename: 'rtl-markdown-preview.js' });
 const previewElement = {
     dataset: {},
+    style: {},
     attributes: new Map(),
     setAttribute(name, value) { this.attributes.set(name, value); },
     getAttribute(name) { return this.attributes.get(name) || null; },
 };
 const previewRoot = {
+    style: {},
+    setAttribute() {},
+    removeAttribute() {},
     querySelectorAll(selector) { return selector === 'p,blockquote,h1,h2,h3,h4,h5,h6,dt,dd,figcaption' ? [previewElement] : []; },
 };
 previewElement.innerText = '';
@@ -356,15 +360,15 @@ assert.match(extensionSource, /function unsupportedInstallMessage\(filePath\)/);
 assert.match(extensionSource, /نسخهٔ Snap روی فایلسیستم فقطخواندنی نصب شده و قابل پچ نیست/);
 assert.match(extensionSource, /https:\/\/code\.visualstudio\.com\/Download/);
 assert.match(extensionSource, /assertWritableInstallation\(found\.htmlPath\)/);
-assert.match(extensionSource, /'بستن VS Code'/);
-assert.match(extensionSource, /workbench\.action\.quit/);
-assert.doesNotMatch(extensionSource, /workbench\.action\.reloadWindow/);
+assert.doesNotMatch(extensionSource, /workbench\.action\.quit/);
+assert.match(extensionSource, /workbench\.action\.reloadWindow/);
+assert.match(extensionSource, /'Reload Window'/);
 assert.doesNotMatch(extensionSource, /scheduleWindowsRelaunch/);
 assert.doesNotMatch(extensionSource, /\bspawn\(/);
-assert.match(extensionSource, /patch is absent or outdated; run reinstall and fully restart VS Code/);
-assert.doesNotMatch(extensionSource, /پچ نیاز به نصب مجدد دارد\. برای جلوگیری از هشدار integrity/);
-assert.doesNotMatch(extensionSource, /'startupApply'/);
-assert.doesNotMatch(extensionSource, /doPatch\(true, true\)/);
+assert.match(extensionSource, /Previously enabled patch is missing or outdated; repairing the installation\./);
+assert.match(extensionSource, /پچ نیاز به نصب مجدد دارد\./);
+assert.match(extensionSource, /'startupApply'/);
+assert.match(extensionSource, /doPatch\(true, true\)/);
 assert.match(extensionSource, /const nativeEditorEnabled = enable && \(options\.areas\.inputs && options\.areas\.promptInputs \|\| options\.areas\.editorsCode \|\| options\.areas\.editorComments\)/);
 assert.match(extensionSource, /const nextBundle = nativeEditorEnabled \? engine\.applyEditorBridge\(originalBundle\) : engine\.removeEditorBridge\(originalBundle\)/);
 assert.match(extensionSource, /const nativeRequired = options\.areas\.inputs && options\.areas\.promptInputs \|\| options\.areas\.editorsCode \|\| options\.areas\.editorComments/);

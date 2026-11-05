@@ -6,6 +6,39 @@
     const LEAF_SELECTOR = 'p,blockquote,h1,h2,h3,h4,h5,h6,dt,dd,figcaption';
     const SKIP_SELECTOR = 'pre,code,.vscode-code-block,.katex,.katex-display,math,svg,canvas,[aria-hidden="true"]';
 
+    function safeFontFamily(value) {
+        if (typeof value !== 'string' || value.length > 200) return '';
+        const tokens = value.match(/"[^"\r\n]*"|'[^'\r\n]*'|[^,]+|,/g) || [];
+        const families = [];
+        let expectName = true;
+        for (const token of tokens) {
+            const part = token.trim();
+            if (!expectName) {
+                if (part !== ',') return '';
+            } else {
+                const name = /^(".*"|'.*')$/u.test(part) ? part.slice(1, -1).trim() : part;
+                if (!name || !/^[\p{L}\p{N}\p{M} _.-]+$/u.test(name)) return '';
+                families.push(`"${name}"`);
+            }
+            expectName = !expectName;
+        }
+        return expectName ? '' : families.join(', ');
+    }
+
+    function applyFont(root, config) {
+        const font = config.font || {};
+        const enabled = config.enabled !== false && font.enabled !== false;
+        const family = enabled ? safeFontFamily(font.family) : '';
+        const size = enabled && typeof font.size === 'number' && font.size >= 7 && font.size <= 96 ? `${font.size}px` : '';
+        const lineHeight = enabled && typeof font.lineHeight === 'number' && font.lineHeight >= 1 && font.lineHeight <= 4 ? String(font.lineHeight) : '';
+        // Empty values (including zero settings) restore normal inheritance.
+        root.style.fontFamily = family;
+        root.style.fontSize = size;
+        root.style.lineHeight = lineHeight;
+        if (family || size || lineHeight) root.setAttribute('data-rtlc-preview-font', 'true');
+        else root.removeAttribute('data-rtlc-preview-font');
+    }
+
     function readConfig() {
         const marker = document.getElementById('rtl-copilot-preview-config');
         if (!marker) return { enabled: true, mode: 'auto', lists: true, tables: true };
@@ -73,6 +106,7 @@
         const root = document.querySelector('.markdown-body');
         if (!root) return;
         const config = readConfig();
+        applyFont(root, config);
         if (!config.enabled) {
             clear(root);
             return;

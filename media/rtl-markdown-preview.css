@@ -1,4 +1,26 @@
 /* Noor Persian RTL — built-in Markdown Preview */
+/* Prose inherits root typography, including nested lists and table cells.
+   Code always uses editor metrics, not the surrounding prose metrics. */
+[data-rtlc-preview-font] :is(pre, code, .vscode-code-block),
+[data-rtlc-preview-font] :is(pre, code, .vscode-code-block) * {
+    font-family: var(--vscode-editor-font-family, monospace) !important;
+    font-size: var(--vscode-editor-font-size, 14px) !important;
+    line-height: var(--vscode-editor-line-height, normal) !important;
+}
+
+/* These are not prose. Preserve their native font rules rather than inheriting
+   the user-selected prose family from the preview root. */
+[data-rtlc-preview-font] :is(.katex, .katex-display, .MathJax, math, svg, canvas),
+[data-rtlc-preview-font] :is(.katex, .katex-display, .MathJax, math, svg, canvas) * {
+    font-family: revert;
+    font-size: revert;
+    line-height: normal;
+}
+
+[data-rtlc-preview-font] :is(.codicon, .icon, [class*="icon-"]) {
+    font-family: var(--vscode-icon-font-family, codicon);
+}
+
 .markdown-body [data-rtlc-preview-dir="rtl"] {
     direction: rtl;
     text-align: right;

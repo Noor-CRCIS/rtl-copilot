@@ -477,11 +477,11 @@ function refreshStatusBar() {
 
 async function promptFullRestart(message) {
     const choice = await vscode.window.showInformationMessage(
-        `${message} برای بارگذاری پچ، VS Code را کاملاً ببندید و دوباره باز کنید.`,
-        'بستن VS Code', 'بعداً', 'Log',
+        `${message} برای بارگذاری تغییرات، پنجره را دوباره بارگذاری کنید.`,
+        'Reload Window', 'بعداً', 'Log',
     );
     if (choice === 'Log') return outputChannel.show(true);
-    if (choice === 'بستن VS Code') await vscode.commands.executeCommand('workbench.action.quit');
+    if (choice === 'Reload Window') await vscode.commands.executeCommand('workbench.action.reloadWindow');
 }
 
 async function doPatch(enable, quiet = false) {
@@ -682,8 +682,7 @@ async function cmdSelectFont() {
         vscode.l10n.t('نصب مجدد')
     );
     if (choice === vscode.l10n.t('نصب مجدد')) {
-        const ok = await safeRun(() => doPatch(true), 'reinstall-after-font');
-        if (ok) await promptFullRestart(vscode.l10n.t('پچ برای فونت جدید چت بهروزرسانی شد.'));
+        await safeRun(() => doPatch(true), 'reinstall-after-font');
     }
 }
 
@@ -729,9 +728,20 @@ async function onStartup() {
         } catch { ready = false; }
     }
     if (ready) return setStatusBar(true);
+    // Repair only installations explicitly enabled by the user. A fresh
+    // install must not silently modify application files or request elevation.
+    if (extensionContext.globalState.get(KEY_DISABLED) !== false) {
+        log('Patch not enabled yet; run enable once to allow startup repair.');
+        return setStatusBar(false);
+    }
+    log('Previously enabled patch is missing or outdated; repairing the installation.');
+    const repaired = await safeRun(() => doPatch(true, true), 'startupApply');
+    if (repaired) {
+        setStatusBar(true);
+        if (globalSetting('notifyOnUpdate', true)) await promptFullRestart('پچ RTL بازیابی شد.');
+        return;
+    }
     setStatusBar(false);
-    if (!globalSetting('notifyOnUpdate', true)) return;
-    log(`${EXT_LABEL} v${engine.VERSION}: patch is absent or outdated; run reinstall and fully restart VS Code.`);
     statusBarItem.tooltip = `${EXT_LABEL} v${engine.VERSION}: پچ نیاز به نصب مجدد دارد. روی RTL کلیک کنید یا فرمان «نصب مجدد پچ» را اجرا کنید.`;
     statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
 }
@@ -768,6 +778,7 @@ function activate(context) {
             if (event.affectsConfiguration(`${EXT_ID}.areas.markdownPreview`)
                 || event.affectsConfiguration(`${EXT_ID}.areas.lists`)
                 || event.affectsConfiguration(`${EXT_ID}.areas.tables`)
+                || event.affectsConfiguration(`${EXT_ID}.font`)
                 || event.affectsConfiguration(`${EXT_ID}.mode`)) {
                 vscode.commands.executeCommand('markdown.preview.refresh');
             }
@@ -785,6 +796,7 @@ function activate(context) {
                     mode: config.get('mode', 'auto'),
                     lists: config.get('areas.lists', true),
                     tables: config.get('areas.tables', true),
+                    font: patchOptions().font,
                 }));
                 const html = originalRender.call(this, tokens, options, env);
                 return `<span id="rtl-copilot-preview-config" hidden aria-hidden="true" data-config="${payload}"></span>${html}`;

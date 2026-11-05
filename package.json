@@ -2,7 +2,7 @@
   "name": "rtl-copilot",
   "displayName": "Noor RTL — VS Code, Copilot & AI Chat",
   "description": "راست‌چین هوشمند نور برای فارسی و عربی در VS Code، GitHub Copilot و AI Chat؛ تنظیم مستقل ورودی‌ها، Markdown و کامنت‌های ادیتور.",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "publisher": "Noor-CRCIS",
   "license": "MIT",
   "icon": "icon.png",
@@ -417,13 +417,13 @@
           "type": "boolean",
           "default": false,
           "scope": "application",
-          "description": "جهت خودکار فقط در ادیتور فایل؛ پیش‌فرض خاموش. ورودی پرامپت تنظیم مستقل autoInputDirection دارد. نیازمند نصب مجدد پچ و بستن کامل VS Code است."
+          "description": "جهت خودکار فقط در ادیتور فایل؛ پیش‌فرض خاموش. ورودی پرامپت تنظیم مستقل autoInputDirection دارد. نیازمند نصب مجدد پچ و Reload Window است."
         },
         "rtlCopilot.autoInputDirection": {
           "type": "boolean",
           "default": true,
           "scope": "application",
-          "description": "جهت خودکار ورودی‌های پشتیبانی‌شده و پرامپت؛ پیش‌فرض روشن. در پرامپت Monaco جهت هر خط با اولین حرف فارسی یا لاتین تعیین و تا پاک‌شدن خط ثابت می‌ماند؛ ورودی خالی اجباری راست‌چین نمی‌شود. نیازمند نصب مجدد پچ و بستن کامل VS Code است."
+          "description": "جهت خودکار ورودی‌های پشتیبانی‌شده و پرامپت؛ پیش‌فرض روشن. در پرامپت Monaco جهت هر خط با اولین حرف فارسی یا لاتین تعیین و تا پاک‌شدن خط ثابت می‌ماند؛ ورودی خالی اجباری راست‌چین نمی‌شود. نیازمند نصب مجدد پچ و Reload Window است."
         },
         "rtlCopilot.areas.terminal": {
           "type": "boolean",
@@ -475,7 +475,7 @@
     }
   },
   "scripts": {
-    "test": "node test-engine.cjs && node test-native-direction.cjs && node test-comment-input.cjs && node test-privileged-write.cjs && node test-docs.cjs && node test-fonts-uninstall.cjs",
+    "test": "node test-engine.cjs && node test-native-direction.cjs && node test-comment-input.cjs && node test-font-coverage.cjs && node test-privileged-write.cjs && node test-docs.cjs && node test-fonts-uninstall.cjs",
     "package": "vsce package --no-dependencies --allow-missing-repository",
     "vscode:uninstall": "node ./uninstall.js"
   },

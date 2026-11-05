@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const path = require('path');
 
-const VERSION = '3.1.0';
+const VERSION = '3.1.1';
 const PATCH_START = '<!-- RTL-COPILOT:START -->';
 const PATCH_END = '<!-- RTL-COPILOT:END -->';
 const RUNTIME_NAME = 'rtl-copilot-runtime.js';
@@ -147,6 +147,26 @@ function sanitizeSelector(value) {
     return selector;
 }
 
+// Parse a deliberately small font-family grammar, never interpolate raw CSS.
+function safeFontFamily(value) {
+    if (typeof value !== 'string' || value.length > 200) return '';
+    const names = value.match(/"[^"\r\n]*"|'[^'\r\n]*'|[^,]+|,/g) || [];
+    const families = [];
+    let expectName = true;
+    for (const token of names) {
+        const part = token.trim();
+        if (!expectName) {
+            if (part !== ',') return '';
+        } else {
+            const name = /^(".*"|'.*')$/u.test(part) ? part.slice(1, -1).trim() : part;
+            if (!name || !/^[\p{L}\p{N}\p{M} _.-]+$/u.test(name)) return '';
+            families.push(`"${name}"`);
+        }
+        expectName = !expectName;
+    }
+    return expectName ? '' : families.join(', ');
+}
+
 function normalizeOptions(raw = {}) {
     const areas = {};
     for (const [name, definition] of Object.entries(AREA_DEFINITIONS)) {
@@ -160,7 +180,7 @@ function normalizeOptions(raw = {}) {
         ? raw.additionalCSS.slice(0, 20000)
         : '';
     const fontRaw = raw.font && typeof raw.font === 'object' ? raw.font : {};
-    const family = typeof fontRaw.family === 'string' ? fontRaw.family.trim().slice(0, 200) : '';
+    const family = safeFontFamily(fontRaw.family);
     const size = typeof fontRaw.size === 'number' && fontRaw.size >= 7 && fontRaw.size <= 96 ? fontRaw.size : 0;
     const lineHeight = typeof fontRaw.lineHeight === 'number' && fontRaw.lineHeight >= 1 && fontRaw.lineHeight <= 4 ? fontRaw.lineHeight : 0;
     const fontEnabled = fontRaw.enabled !== false && (Boolean(family) || size > 0 || lineHeight > 0);
@@ -205,8 +225,20 @@ function buildCss(rawOptions = {}) {
         if (options.font.lineHeight) fontDecls.push(`line-height:${options.font.lineHeight}!important`);
         if (fontDecls.length) {
             const fontTargets = [...generic,
+                ...(options.areas.lists ? AREA_DEFINITIONS.lists.selectors : []),
+                ...(options.areas.tables ? AREA_DEFINITIONS.tables.selectors : []),
                 ...(options.areas.inputs ? AREA_DEFINITIONS.inputs.selectors.filter(s => !s.includes('.monaco-editor')) : [])];
-            chunks.push(`/* RTL-COPILOT font: user-selected font for RTL chat */\n${[...new Set(fontTargets)].join(',\n')}{${fontDecls.join(';')}}`);
+            // Do not style editor ancestors either: inherited metrics can break Monaco.
+            const protectedRoots = '.monaco-editor,.monaco-diff-editor,.xterm,.terminal-outer-container,.katex,.katex-display,.MathJax,math,svg,canvas,.codicon,.icon,[class*="icon-"]';
+            const excluded = `pre,code,.vscode-code-block,${protectedRoots}`;
+            const guard = `:not(:is(${excluded},:is(${excluded}) *)):not(:has(:is(${protectedRoots})))`;
+            const targets = [...new Set(fontTargets)].flatMap(s => [`:is(${s})${guard}`, `:is(${s}) *${guard}`]);
+            if (targets.length) {
+                chunks.push(`/* RTL-COPILOT font: user-selected font for RTL chat */\n${targets.join(',\n')}{${fontDecls.join(';')}}`);
+                // Inline code and pre inherit from prose unless explicitly restored.
+                const codeTargets = [...new Set(fontTargets)].map(s => `:is(${s}) :is(pre,code,.vscode-code-block):not(:is(${protectedRoots},:is(${protectedRoots}) *))`);
+                chunks.push(`${codeTargets.join(',\n')}{font-family:var(--vscode-editor-font-family,monospace)!important;font-size:var(--vscode-editor-font-size,14px)!important;line-height:var(--vscode-editor-line-height,normal)!important;}`);
+            }
         }
     }
 
