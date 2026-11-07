@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const path = require('path');
 
-const VERSION = '3.1.1';
+const VERSION = '3.1.2';
 const PATCH_START = '<!-- RTL-COPILOT:START -->';
 const PATCH_END = '<!-- RTL-COPILOT:END -->';
 const RUNTIME_NAME = 'rtl-copilot-runtime.js';
@@ -236,7 +236,9 @@ function buildCss(rawOptions = {}) {
             if (targets.length) {
                 chunks.push(`/* RTL-COPILOT font: user-selected font for RTL chat */\n${targets.join(',\n')}{${fontDecls.join(';')}}`);
                 // Inline code and pre inherit from prose unless explicitly restored.
-                const codeTargets = [...new Set(fontTargets)].map(s => `:is(${s}) :is(pre,code,.vscode-code-block):not(:is(${protectedRoots},:is(${protectedRoots}) *))`);
+                // Embedded editors own their metrics, including every enclosing
+                // code wrapper. Only restore typography for plain Markdown code.
+                const codeTargets = [...new Set(fontTargets)].map(s => `:is(${s}) :is(pre,code,.vscode-code-block):not(:is(${protectedRoots},:is(${protectedRoots}) *)):not(:has(:is(${protectedRoots})))`);
                 chunks.push(`${codeTargets.join(',\n')}{font-family:var(--vscode-editor-font-family,monospace)!important;font-size:var(--vscode-editor-font-size,14px)!important;line-height:var(--vscode-editor-line-height,normal)!important;}`);
             }
         }

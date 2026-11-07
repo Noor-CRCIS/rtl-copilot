@@ -18,7 +18,7 @@ const ROOT = __dirname;
 /* ---------- 1. Manifest localization ---------- */
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
-assert.equal(manifest.version, '3.1.1', 'extension version must be 3.1.1');
+assert.equal(manifest.version, engine.VERSION, 'manifest and patch versions must match');
 assert.equal(manifest.scripts['vscode:uninstall'], 'node ./uninstall.js', 'vscode:uninstall hook must be registered');
 
 const nlsEn = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.nls.json'), 'utf8'));

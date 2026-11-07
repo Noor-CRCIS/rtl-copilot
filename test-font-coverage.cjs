@@ -6,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const engine = require('./rtl-engine');
 
-assert.equal(engine.VERSION, '3.1.1');
+assert.equal(engine.VERSION, '3.1.2');
 const font = { enabled: true, family: '"Vazirmatn", \'Noto Sans Arabic\'', size: 18, lineHeight: 1.8 };
 assert.equal(engine.normalizeOptions({ font }).font.family, '"Vazirmatn", "Noto Sans Arabic"');
 for (const family of ['Arial; color:red', 'Arial}body{display:none}', '</style><script>x</script>', 'url(evil)', 'Arial\\22', 'Arial,,serif', '"unterminated', 'Arial,']) {
@@ -26,6 +26,11 @@ for (const excluded of ['pre,code', '.monaco-editor', '.monaco-diff-editor', '.k
 }
 assert.ok(typography.includes(':not(:has(:is('), 'editor ancestors must not acquire changed metrics');
 assert.ok(typography.includes('font-family:var(--vscode-editor-font-family,monospace)'));
+const codeRestoreSelectors = typography.split('\n').filter(line => line.includes(' :is(pre,code,.vscode-code-block)'));
+assert.ok(codeRestoreSelectors.length > 0);
+for (const selector of codeRestoreSelectors) {
+    assert.ok(selector.includes(':not(:has(:is('), 'code wrappers containing Monaco must retain native typography');
+}
 const zeroCss = engine.buildCss({ font: { family: 'Vazirmatn', size: 0, lineHeight: 0 } });
 assert.ok(!zeroCss.includes('font-size:0'));
 assert.ok(!zeroCss.includes('line-height:0'));
