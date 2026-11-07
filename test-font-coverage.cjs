@@ -6,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const engine = require('./rtl-engine');
 
-assert.equal(engine.VERSION, '3.1.2');
+assert.equal(engine.VERSION, '3.1.3');
 const font = { enabled: true, family: '"Vazirmatn", \'Noto Sans Arabic\'', size: 18, lineHeight: 1.8 };
 assert.equal(engine.normalizeOptions({ font }).font.family, '"Vazirmatn", "Noto Sans Arabic"');
 for (const family of ['Arial; color:red', 'Arial}body{display:none}', '</style><script>x</script>', 'url(evil)', 'Arial\\22', 'Arial,,serif', '"unterminated', 'Arial,']) {
@@ -19,17 +19,20 @@ const css = engine.buildCss({ font });
 const typography = css.split('/* RTL-COPILOT font:')[1].split('/* RTL-COPILOT: lists')[0];
 for (const selector of ['.rendered-markdown ul', '.rendered-markdown ol', '.rendered-markdown table', '.markdown-body table']) {
     assert.ok(typography.includes(selector), `missing ${selector}`);
-    assert.ok(typography.split('\n').some(line => line.includes(selector) && line.includes(') *:not(')), `missing nested coverage for ${selector}`);
+    assert.ok(typography.split('\n').some(line => line.includes(selector) && line.includes(' *:not(:is(')), `missing nested coverage for ${selector}`);
 }
 for (const excluded of ['pre,code', '.monaco-editor', '.monaco-diff-editor', '.katex', 'math', '.codicon', '.xterm', '.terminal-outer-container']) {
     assert.ok(typography.includes(excluded), `missing exclusion ${excluded}`);
 }
-assert.ok(typography.includes(':not(:has(:is('), 'editor ancestors must not acquire changed metrics');
+// :has() selectors re-match the whole workbench DOM on every mutation and
+// froze the chat renderer; typography must stay inheritance-based and small.
+assert.ok(!typography.includes(':has('), 'typography rules must not use :has()');
+assert.ok(typography.length < 70000, `font CSS too large: ${typography.length} bytes`);
 assert.ok(typography.includes('font-family:var(--vscode-editor-font-family,monospace)'));
-const codeRestoreSelectors = typography.split('\n').filter(line => line.includes(' :is(pre,code,.vscode-code-block)'));
+const codeRestoreSelectors = typography.split('\n').filter(line => line.includes(' :is(pre,code)'));
 assert.ok(codeRestoreSelectors.length > 0);
 for (const selector of codeRestoreSelectors) {
-    assert.ok(selector.includes(':not(:has(:is('), 'code wrappers containing Monaco must retain native typography');
+    assert.ok(selector.includes(':not(:is('), 'protected descendants inside code wrappers must keep native typography');
 }
 const zeroCss = engine.buildCss({ font: { family: 'Vazirmatn', size: 0, lineHeight: 0 } });
 assert.ok(!zeroCss.includes('font-size:0'));

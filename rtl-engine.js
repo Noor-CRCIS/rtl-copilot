@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const path = require('path');
 
-const VERSION = '3.1.2';
+const VERSION = '3.1.3';
 const PATCH_START = '<!-- RTL-COPILOT:START -->';
 const PATCH_END = '<!-- RTL-COPILOT:END -->';
 const RUNTIME_NAME = 'rtl-copilot-runtime.js';
@@ -223,24 +223,35 @@ function buildCss(rawOptions = {}) {
         if (options.font.family) fontDecls.push(`font-family:${options.font.family}!important`);
         if (options.font.size) fontDecls.push(`font-size:${options.font.size}px!important`);
         if (options.font.lineHeight) fontDecls.push(`line-height:${options.font.lineHeight}!important`);
-        if (fontDecls.length) {
-            const fontTargets = [...generic,
-                ...(options.areas.lists ? AREA_DEFINITIONS.lists.selectors : []),
-                ...(options.areas.tables ? AREA_DEFINITIONS.tables.selectors : []),
-                ...(options.areas.inputs ? AREA_DEFINITIONS.inputs.selectors.filter(s => !s.includes('.monaco-editor')) : [])];
-            // Do not style editor ancestors either: inherited metrics can break Monaco.
-            const protectedRoots = '.monaco-editor,.monaco-diff-editor,.xterm,.terminal-outer-container,.katex,.katex-display,.MathJax,math,svg,canvas,.codicon,.icon,[class*="icon-"]';
-            const excluded = `pre,code,.vscode-code-block,${protectedRoots}`;
-            const guard = `:not(:is(${excluded},:is(${excluded}) *)):not(:has(:is(${protectedRoots})))`;
-            const targets = [...new Set(fontTargets)].flatMap(s => [`:is(${s})${guard}`, `:is(${s}) *${guard}`]);
-            if (targets.length) {
-                chunks.push(`/* RTL-COPILOT font: user-selected font for RTL chat */\n${targets.join(',\n')}{${fontDecls.join(';')}}`);
-                // Inline code and pre inherit from prose unless explicitly restored.
-                // Embedded editors own their metrics, including every enclosing
-                // code wrapper. Only restore typography for plain Markdown code.
-                const codeTargets = [...new Set(fontTargets)].map(s => `:is(${s}) :is(pre,code,.vscode-code-block):not(:is(${protectedRoots},:is(${protectedRoots}) *)):not(:has(:is(${protectedRoots})))`);
-                chunks.push(`${codeTargets.join(',\n')}{font-family:var(--vscode-editor-font-family,monospace)!important;font-size:var(--vscode-editor-font-size,14px)!important;line-height:var(--vscode-editor-line-height,normal)!important;}`);
-            }
+        const proseTargets = [...generic,
+            ...(options.areas.lists ? AREA_DEFINITIONS.lists.selectors : []),
+            ...(options.areas.tables ? AREA_DEFINITIONS.tables.selectors : []),
+            ...(options.areas.inputs ? AREA_DEFINITIONS.inputs.selectors.filter(s => !s.includes('.monaco-editor')) : [])];
+        // Apply the font once per view container and let normal inheritance
+        // reach every child. Per-leaf guarded selectors (or any :has usage)
+        // multiply selector matching per DOM mutation and freeze the workbench
+        // while chat streams tokens, which blanked rendered content.
+        const containers = [...new Set(proseTargets.map(selector => {
+            const branch = selector.lastIndexOf(' > ');
+            return branch > 0 ? selector.slice(0, branch).trim() : selector;
+        }))];
+        if (fontDecls.length && containers.length) {
+            // Editors, terminals, math, icon fonts, and Monaco host wrappers
+            // keep their own typography.
+            const protectedRoots = '.monaco-editor,.monaco-diff-editor,.vscode-code-block,.xterm,.terminal-outer-container,.katex,.katex-display,.MathJax,math,svg,canvas,.codicon,.icon,[class*="icon-"]';
+            // One :is() list per pattern keeps the sheet small; repeating the
+            // full guard per selector re-parses and re-matches thousands of times.
+            const containerList = `:is(${containers.join(',')})`;
+            const guard = `:not(:is(${protectedRoots},:is(${protectedRoots}) *))`;
+            chunks.push(`/* RTL-COPILOT font: user-selected font for RTL chat */\n${containerList}${guard},\n${containerList} *${guard}{${fontDecls.join(';')}}`);
+            // Plain Markdown code keeps editor typography. The Monaco host
+            // wrapper (.vscode-code-block) is never touched: its own element
+            // metrics must stay native so the embedded editor keeps measuring
+            // lines correctly and does not render blank.
+            const codeTargets = [
+                `${containerList} :is(pre,code)${guard}`,
+                `${containerList} :is(pre,code) *${guard}`];
+            chunks.push(`/* RTL-COPILOT code-font: code keeps editor typography */\n${codeTargets.join(',\n')}{font-family:var(--vscode-editor-font-family,monospace)!important;font-size:var(--vscode-editor-font-size,14px)!important;line-height:normal!important;}`);
         }
     }
 
