@@ -3,6 +3,10 @@
 
 <p align="right" dir="rtl">&#x2067;تازه‌های <strong>Noor RTL — VS Code, Copilot &amp; AI Chat</strong>. راهنمای نصب و تنظیم‌ها در <a href="https://github.com/Noor-CRCIS/rtl-copilot/blob/main/README.md">معرفی افزونه</a> آمده است.&#x2069;</p>
 
+<h2 align="right" dir="rtl">&#x2067;نسخهٔ 3.1.5 — ۸ نوامبر ۲۰۲۶&#x2069;</h2>
+<p align="right" dir="rtl">&#x2067;رفع شکست کامل نصب پچ در نسخه‌های جدید VS Code: اگر پل ادیتور Monaco در bundle ساختهٔ VS Code پشتیبانی نشود، نصب دیگر خطا نمی‌دهد؛ بقیهٔ قابلیت‌ها (از جمله راست‌چین خودکار ورودی‌ها و پرامپت چت) نصب می‌شوند و فقط یک هشدار نمایش داده می‌شود.&#x2069;</p>
+<p align="right" dir="rtl">&#x2067;بهبود فرمان «وضعیت»: نسخهٔ پچ نصب‌شده، سازگاری فایل runtime، وضعیت پل Monaco و تنظیم‌های کلیدی ورودی/ادیتور را یک‌جا نشان می‌دهد و در صورت ناسازگاری دکمهٔ «نصب مجدد پچ» پیشنهاد می‌شود.&#x2069;</p>
+
 <h2 align="right" dir="rtl">&#x2067;نسخهٔ 3.1.4 — ۸ نوامبر ۲۰۲۶&#x2069;</h2>
 <p align="right" dir="rtl">&#x2067;رفع کارنکردن میان‌بر دستی جهت در ادیتور فایل: کلیدهای <code class="notranslate">Ctrl + Shift</code> همراه با جهت چپ/راست اکنون مستقل از تنظیم <code class="notranslate">rtlCopilot.areas.editorsCode</code> همیشه کار می‌کنند؛ آن تنظیم فقط جهت خودکار خطوط کد را روشن می‌کند.&#x2069;</p>
 <p align="right" dir="rtl">&#x2067;افزودن حالت مستقیم کلیدهای جهت‌دار: <code class="notranslate">Ctrl + Shift + Right</code> بلافاصله RTL و <code class="notranslate">Ctrl + Shift + Left</code> بلافاصله LTR می‌شود؛ حالت قبلی (نگه‌داشتن <code class="notranslate">Ctrl + Shift</code> و فشردن شیفت چپ یا راست) همچنان کار می‌کند. در macOS، <code class="notranslate">Command</code> جایگزین <code class="notranslate">Ctrl</code> می‌شود.&#x2069;</p>

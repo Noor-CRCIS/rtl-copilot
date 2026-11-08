@@ -373,14 +373,27 @@ function buildTransaction(htmlPath, enable) {
     // The bridge registers editors so the manual Ctrl+Shift chord always
     // works; automatic per-area rendering is decided inside the runtime.
     const nativeEditorEnabled = enable;
-    const candidateBundlePath = findWorkbenchBundle(htmlPath, nativeEditorEnabled);
+    let candidateBundlePath = null;
+    let bundleWarning = null;
+    try {
+        candidateBundlePath = findWorkbenchBundle(htmlPath, nativeEditorEnabled);
+    } catch (error) {
+        if (!nativeEditorEnabled) throw error;
+        bundleWarning = error.message;
+    }
     let bundlePath = null;
     let bundleContent = null;
     let bundleBytes = null;
     let bundleChecksum = null;
     if (candidateBundlePath) {
         const originalBundle = fs.readFileSync(candidateBundlePath, 'utf8');
-        const nextBundle = nativeEditorEnabled ? engine.applyEditorBridge(originalBundle) : engine.removeEditorBridge(originalBundle);
+        let nextBundle = originalBundle;
+        try {
+            nextBundle = nativeEditorEnabled ? engine.applyEditorBridge(originalBundle) : engine.removeEditorBridge(originalBundle);
+        } catch (error) {
+            if (!nativeEditorEnabled) throw error;
+            bundleWarning = error.message;
+        }
         if (nextBundle !== originalBundle) {
             bundlePath = candidateBundlePath;
             bundleContent = nextBundle;
@@ -389,16 +402,17 @@ function buildTransaction(htmlPath, enable) {
             updatedProduct = bundleChecksum.product;
             entries.push({ path: bundlePath, content: bundleBytes });
         }
-    } else if (nativeEditorEnabled) {
-        throw new Error('bundle سازگار workbench.desktop.main.js برای RTL بومی Monaco پیدا نشد.');
+    } else if (nativeEditorEnabled && !bundleWarning) {
+        bundleWarning = 'bundle سازگار workbench.desktop.main.js برای RTL بومی Monaco پیدا نشد.';
     }
+    if (bundleWarning) log(`WARN Monaco bridge unavailable; installing without it: ${bundleWarning}`);
     const productContent = `${JSON.stringify(updatedProduct, null, 2)}\n`;
     if (productContent !== fs.readFileSync(productInfo.productPath, 'utf8')) {
         entries.push({ path: productInfo.productPath, content: productContent });
     }
     if (enable) entries.push({ path: runtimePath, content: engine.buildRuntime(options) });
     else if (exists(runtimePath)) entries.push({ path: runtimePath, operation: 'delete' });
-    return { entries, htmlPath, htmlContent, runtimePath, productInfo, checksumResult, bundlePath, bundleContent, bundleBytes, bundleChecksum, bundleEnabled: nativeEditorEnabled, enable };
+    return { entries, htmlPath, htmlContent, runtimePath, productInfo, checksumResult, bundlePath, bundleContent, bundleBytes, bundleChecksum, bundleEnabled: nativeEditorEnabled, bundleWarning, enable };
 }
 
 function verifyTransaction(transaction, enabled) {
@@ -497,6 +511,9 @@ async function doPatch(enable, quiet = false) {
     await executeTransaction(transaction, enable);
     await extensionContext.globalState.update(KEY_DISABLED, !enable);
     setStatusBar(enable);
+    if (enable && transaction.bundleWarning) {
+        void vscode.window.showWarningMessage(`${EXT_LABEL}: پل ادیتور Monaco نصب نشد (${transaction.bundleWarning})؛ تشخیص خودکار جهت پرامپت چت و کنترل دستی خط ادیتور در این نسخهٔ VS Code محدود می‌ماند، بقیهٔ قابلیت‌ها فعال است.`);
+    }
     if (!quiet) await promptFullRestart(`${EXT_LABEL}: ${enable ? 'فعال' : 'غیرفعال'} شد.`);
     return true;
 }
@@ -545,9 +562,37 @@ function cmdStatus() {
     if (!found) return vscode.window.showWarningMessage(`${EXT_LABEL}: workbench پیدا نشد.`);
     const html = fs.readFileSync(found.htmlPath, 'utf8');
     const marker = engine.markerState(html);
+    const options = patchOptions();
+    const expectedRuntime = engine.buildRuntime(options);
+    const runtimePath = path.join(path.dirname(found.htmlPath), engine.RUNTIME_NAME);
+    const runtimeOk = exists(runtimePath) && fs.readFileSync(runtimePath, 'utf8') === expectedRuntime;
+    let bridgeLine = 'پل Monaco: ❌ bundle پیدا نشد';
+    try {
+        const bundlePath = findWorkbenchBundle(found.htmlPath, false);
+        if (bundlePath) {
+            const state = engine.editorBridgeState(fs.readFileSync(bundlePath, 'utf8'));
+            bridgeLine = `پل Monaco: ${state === 'valid' ? '✅ فعال' : state === 'invalid' ? '⚠️ خراب' : '❌ نصب نیست'}`;
+        }
+    } catch (error) { bridgeLine = `پل Monaco: ⚠️ ${error.message}`; }
+    const lines = [
+        `${EXT_LABEL} v${engine.VERSION}`,
+        `پچ: ${marker === 'valid' ? '✅' : marker === 'absent' ? '❌' : '⚠️'} نسخهٔ پچ نصب‌شده: ${engine.patchedVersion(html) || '—'}`,
+        `فایل runtime: ${runtimeOk ? '✅ سازگار' : '❌ ناسازگار — نیازمند نصب مجدد پچ'}`,
+        bridgeLine,
+        `تنظیم‌ها: ورودی پرامپت=${options.areas.inputs && options.areas.promptInputs} | تشخیص خودکار ورودی=${options.autoInputDirection} | ادیتور فایل خودکار=${options.areas.editorsCode}`,
+        `مسیر: ${found.htmlPath}`,
+    ];
+    log(lines.join('\n'));
+    const stale = marker !== 'valid' || engine.patchedVersion(html) !== engine.VERSION || !runtimeOk;
+    const actions = stale ? ['نصب مجدد پچ', 'Log'] : ['Log'];
     return vscode.window.showInformationMessage(
-        `${EXT_LABEL}: ${marker === 'valid' ? '✅ فعال' : marker === 'absent' ? '❌ غیرفعال' : '⚠️ marker خراب'} | patch v${engine.patchedVersion(html)} | ${found.variant}`,
-    );
+        `${EXT_LABEL}: ${marker === 'valid' ? '✅ فعال' : '❌ غیرفعال'} | پچ v${engine.patchedVersion(html) || '—'} | runtime ${runtimeOk ? 'سازگار' : 'ناسازگار'} | ${bridgeLine.replace(/^پل Monaco: /, '')}`,
+        ...actions,
+    ).then(choice => {
+        if (choice === 'نصب مجدد پچ') return cmdReinstall();
+        if (choice === 'Log') return outputChannel.show(true);
+        return undefined;
+    });
 }
 
 function cmdBackup() {
@@ -712,16 +757,28 @@ async function onStartup() {
     let ready = engine.markerState(html) === 'valid' && engine.patchedVersion(html) === engine.VERSION;
     if (ready) {
         try {
-            const nativeRequired = true; // the manual Ctrl+Shift chord needs the bridge whenever the patch is enabled
             const expectedRuntime = engine.buildRuntime(patchOptions());
             const runtimePath = path.join(path.dirname(found.htmlPath), engine.RUNTIME_NAME);
-            const bundlePath = findWorkbenchBundle(found.htmlPath);
+            // A bridge-less install is a supported degraded mode (newer VS
+            // Code builds may lack the Monaco anchor), so only demand bundle
+            // validation when the anchor actually exists in this bundle.
+            let bundlePath = null;
+            let bundleBridgeable = false;
+            try {
+                bundlePath = findWorkbenchBundle(found.htmlPath, false);
+                if (bundlePath) {
+                    engine.applyEditorBridge(fs.readFileSync(bundlePath, 'utf8'));
+                    bundleBridgeable = true;
+                }
+            } catch {
+                bundleBridgeable = false; // anchor missing → degraded mode is acceptable
+            }
             const productInfo = findProductJson(found.htmlPath);
             ready = exists(runtimePath)
                 && fs.readFileSync(runtimePath, 'utf8') === expectedRuntime
                 && Boolean(productInfo)
                 && productInfo.data.checksums[engine.checksumKey(productInfo.appBase, found.htmlPath, productInfo.data.checksums)] === engine.checksum(html);
-            if (ready && nativeRequired) {
+            if (ready && bundleBridgeable) {
                 ready = Boolean(bundlePath)
                     && engine.editorBridgeState(fs.readFileSync(bundlePath, 'utf8')) === 'valid'
                     && productInfo.data.checksums[engine.checksumKey(productInfo.appBase, bundlePath, productInfo.data.checksums)] === engine.checksum(fs.readFileSync(bundlePath, 'utf8'));

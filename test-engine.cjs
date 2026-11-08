@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const engine = require('./rtl-engine');
 
-assert.equal(engine.VERSION, '3.1.4');
+assert.equal(engine.VERSION, '3.1.5');
 
 const original = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src \'self\'\"></head><body></body></html>';
 const patched = engine.applyPatchToHtml(original);
@@ -371,8 +371,8 @@ assert.match(extensionSource, /پچ نیاز به نصب مجدد دارد\./);
 assert.match(extensionSource, /'startupApply'/);
 assert.match(extensionSource, /doPatch\(true, true\)/);
 assert.match(extensionSource, /const nativeEditorEnabled = enable;/);
-assert.match(extensionSource, /const nextBundle = nativeEditorEnabled \? engine\.applyEditorBridge\(originalBundle\) : engine\.removeEditorBridge\(originalBundle\)/);
-assert.match(extensionSource, /const nativeRequired = true;/);
+assert.match(extensionSource, /nextBundle = nativeEditorEnabled \? engine\.applyEditorBridge\(originalBundle\) : engine\.removeEditorBridge\(originalBundle\)/);
+assert.match(extensionSource, /Monaco bridge unavailable; installing without it/);
 assert.match(extensionSource, /let busy = false/);
 assert.match(extensionSource, /function executeTransaction\(transaction, enabled\)/);
 assert.match(extensionSource, /const entries = \[\.\.\.backupEntries, \.\.\.transaction\.entries\]/);

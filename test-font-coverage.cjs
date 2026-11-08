@@ -6,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const engine = require('./rtl-engine');
 
-assert.equal(engine.VERSION, '3.1.4');
+assert.equal(engine.VERSION, '3.1.5');
 const font = { enabled: true, family: '"Vazirmatn", \'Noto Sans Arabic\'', size: 18, lineHeight: 1.8 };
 assert.equal(engine.normalizeOptions({ font }).font.family, '"Vazirmatn", "Noto Sans Arabic"');
 for (const family of ['Arial; color:red', 'Arial}body{display:none}', '</style><script>x</script>', 'url(evil)', 'Arial\\22', 'Arial,,serif', '"unterminated', 'Arial,']) {
