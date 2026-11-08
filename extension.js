@@ -125,6 +125,58 @@ function findProductJson(htmlPath) {
     return null;
 }
 
+// Windows installs can keep several product.json files (hash-dir staging
+// directories plus the running install). VS Code integrity reads the one in
+// the tree it actually boots from, so checksum repair must consider them all.
+function findAllProductJson(htmlPath) {
+    const results = [];
+    let dir = path.dirname(htmlPath);
+    for (let depth = 0; depth < 16; depth += 1) {
+        const productPath = path.join(dir, 'product.json');
+        if (exists(productPath)) {
+            try {
+                results.push({ productPath, appBase: dir, data: JSON.parse(fs.readFileSync(productPath, 'utf8')) });
+            } catch (error) {
+                log(`skipping unreadable product.json ${productPath}: ${error.message}`);
+            }
+        }
+        const parent = path.dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+    }
+    return results;
+}
+
+function managedChecksumPaths(htmlPath) {
+    const targets = [htmlPath];
+    try {
+        const bundlePath = findWorkbenchBundle(htmlPath, false);
+        if (bundlePath) targets.push(bundlePath);
+    } catch (error) {
+        log(`bundle probe skipped: ${error.message}`);
+    }
+    return targets;
+}
+
+// Rewrites stored checksums to the real digests of the files this extension
+// manages (patched workbench HTML and Monaco bundle). This is what clears the
+// "Your Code installation appears to be corrupt" warning after a patch, an
+// interrupted write, or a partial VS Code update. Only keys that already
+// exist in product.json are touched; unmanaged checksums keep their values.
+async function reconcileChecksumsForInstall(htmlPath) {
+    const targets = managedChecksumPaths(htmlPath);
+    let changedTotal = 0;
+    for (const productInfo of findAllProductJson(htmlPath)) {
+        const result = engine.reconcileChecksums(productInfo.data, productInfo.appBase, targets, p => fs.readFileSync(p));
+        if (!result.changed.length) continue;
+        const productContent = `${JSON.stringify(result.product, null, 2)}\n`;
+        await writeEntries([{ path: productInfo.productPath, content: productContent }], productInfo.appBase);
+        changedTotal += result.changed.length;
+        log(`checksums reconciled in ${productInfo.productPath}: ${result.changed.map(entry => entry.key).join(', ')}`);
+    }
+    return changedTotal;
+}
+
 function findWorkbenchBundle(htmlPath, requireCompatible = true) {
     const directory = path.dirname(htmlPath);
     const direct = [
@@ -574,22 +626,34 @@ function cmdStatus() {
             bridgeLine = `پل Monaco: ${state === 'valid' ? '✅ فعال' : state === 'invalid' ? '⚠️ خراب' : '❌ نصب نیست'}`;
         }
     } catch (error) { bridgeLine = `پل Monaco: ⚠️ ${error.message}`; }
+    let checksumLine = 'checksum: ✅ مطابق';
+    try {
+        const targets = managedChecksumPaths(found.htmlPath);
+        let mismatch = 0;
+        for (const info of findAllProductJson(found.htmlPath)) {
+            const probe = engine.reconcileChecksums(info.data, info.appBase, targets, p => fs.readFileSync(p));
+            mismatch += probe.changed.length;
+        }
+        if (mismatch) checksumLine = `checksum: ⚠️ ${mismatch} مورد ناسازگار — اخطار corrupt طبیعی است`;
+    } catch (error) { checksumLine = `checksum: ⚠️ ${error.message}`; }
     const lines = [
         `${EXT_LABEL} v${engine.VERSION}`,
         `پچ: ${marker === 'valid' ? '✅' : marker === 'absent' ? '❌' : '⚠️'} نسخهٔ پچ نصب‌شده: ${engine.patchedVersion(html) || '—'}`,
         `فایل runtime: ${runtimeOk ? '✅ سازگار' : '❌ ناسازگار — نیازمند نصب مجدد پچ'}`,
         bridgeLine,
+        checksumLine,
         `تنظیم‌ها: ورودی پرامپت=${options.areas.inputs && options.areas.promptInputs} | تشخیص خودکار ورودی=${options.autoInputDirection} | ادیتور فایل خودکار=${options.areas.editorsCode}`,
         `مسیر: ${found.htmlPath}`,
     ];
     log(lines.join('\n'));
     const stale = marker !== 'valid' || engine.patchedVersion(html) !== engine.VERSION || !runtimeOk;
-    const actions = stale ? ['نصب مجدد پچ', 'Log'] : ['Log'];
+    const actions = stale ? ['نصب مجدد پچ', 'اصلاح چکسام', 'Log'] : ['اصلاح چکسام', 'Log'];
     return vscode.window.showInformationMessage(
-        `${EXT_LABEL}: ${marker === 'valid' ? '✅ فعال' : '❌ غیرفعال'} | پچ v${engine.patchedVersion(html) || '—'} | runtime ${runtimeOk ? 'سازگار' : 'ناسازگار'} | ${bridgeLine.replace(/^پل Monaco: /, '')}`,
+        `${EXT_LABEL}: ${marker === 'valid' ? '✅ فعال' : '❌ غیرفعال'} | پچ v${engine.patchedVersion(html) || '—'} | runtime ${runtimeOk ? 'سازگار' : 'ناسازگار'} | ${bridgeLine.replace(/^پل Monaco: /, '')} | ${checksumLine.replace(/^checksum: /, '')}`,
         ...actions,
     ).then(choice => {
         if (choice === 'نصب مجدد پچ') return cmdReinstall();
+        if (choice === 'اصلاح چکسام') return cmdFixChecksum();
         if (choice === 'Log') return outputChannel.show(true);
         return undefined;
     });
@@ -620,18 +684,12 @@ function cmdFixChecksum() {
         const found = findWorkbenchHtml();
         if (!found) throw new Error('workbench پیدا نشد.');
         assertWritableInstallation(found.htmlPath);
-        const html = fs.readFileSync(found.htmlPath, 'utf8');
-        const productInfo = findProductJson(found.htmlPath);
-        if (!productInfo) throw new Error('product.json پیدا نشد.');
-        const updated = engine.updateWorkbenchChecksum(productInfo.data, productInfo.appBase, found.htmlPath, html);
-        const bundlePath = findWorkbenchBundle(found.htmlPath, false);
-        const bundle = bundlePath ? fs.readFileSync(bundlePath, 'utf8') : null;
-        const bundleUpdated = bundlePath
-            ? engine.updateWorkbenchChecksum(updated.product, productInfo.appBase, bundlePath, bundle)
-            : null;
-        const productContent = `${JSON.stringify(bundleUpdated ? bundleUpdated.product : updated.product, null, 2)}\n`;
-        await writeEntries([{ path: productInfo.productPath, content: productContent }], productInfo.appBase);
-        await promptFullRestart(`${EXT_LABEL}: checksum فایلهای Workbench بازسازی شد.`);
+        const changed = await reconcileChecksumsForInstall(found.htmlPath);
+        if (!changed) {
+            vscode.window.showInformationMessage(`${EXT_LABEL}: همهٔ checksumها با فایل‌های فعلی مطابقت دارند. اگر همچنان اخطار «corrupt» می‌بینید، ابتدا «نصب مجدد پچ» و سپس Reload Window را امتحان کنید.`);
+            return true;
+        }
+        await promptFullRestart(`${EXT_LABEL}: ${changed} checksum ناسازگار با فایل‌های فعلی اصلاح شد.`);
         return true;
     }, 'fixChecksum');
 }
@@ -785,7 +843,13 @@ async function onStartup() {
             }
         } catch { ready = false; }
     }
-    if (ready) return setStatusBar(true);
+    if (ready) {
+        // A valid patch with drifted checksums still triggers VS Code's
+        // "installation appears to be corrupt" warning; heal it silently.
+        try { await reconcileChecksumsForInstall(found.htmlPath); }
+        catch (error) { log(`checksum reconcile failed: ${error.message}`); }
+        return setStatusBar(true);
+    }
     // Repair only installations explicitly enabled by the user. A fresh
     // install must not silently modify application files or request elevation.
     if (extensionContext.globalState.get(KEY_DISABLED) !== false) {

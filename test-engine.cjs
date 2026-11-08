@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const engine = require('./rtl-engine');
 
-assert.equal(engine.VERSION, '3.1.5');
+assert.equal(engine.VERSION, '3.1.6');
 
 const original = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src \'self\'\"></head><body></body></html>';
 const patched = engine.applyPatchToHtml(original);
@@ -295,6 +295,33 @@ assert.equal(engine.checksum(Buffer.from(patched, 'utf8')), engine.checksum(patc
 assert.throws(() => engine.updateWorkbenchChecksum({}, appBase, htmlPath, patched), /checksums/);
 assert.throws(() => engine.checksumKey(appBase, path.join(appBase, 'out', 'missing.js'), originalChecksums), /not found/);
 assert.throws(() => engine.checksumKey(appBase, path.join(temp, 'outside.js'), originalChecksums), /outside/);
+
+{
+    // Corrupt-warning self-heal: reconcile rewrites drifted checksums of
+    // managed files to the real on-disk digests and keeps everything else.
+    const drifted = { name: 'Code', checksums: { 'vs/code/electron-browser/workbench/workbench.html': 'old', 'vs/workbench/workbench.desktop.main.js': 'old-bundle', 'vs/loader.js': 'keep-me' } };
+    const files = new Map([[htmlPath, patched], [bundlePath, 'unmanaged bundle bytes']]);
+    const readFile = p => {
+        if (!files.has(p)) throw new Error('ENOENT');
+        return files.get(p);
+    };
+    const healed = engine.reconcileChecksums(drifted, appBase, [htmlPath, bundlePath], readFile);
+    assert.equal(healed.changed.length, 2, 'both drifted keys are healed');
+    assert.deepEqual(healed.changed.map(entry => entry.key).sort(), ['vs/code/electron-browser/workbench/workbench.html', 'vs/workbench/workbench.desktop.main.js']);
+    assert.equal(healed.product.checksums['vs/code/electron-browser/workbench/workbench.html'], engine.checksum(patched));
+    assert.equal(healed.product.checksums['vs/workbench/workbench.desktop.main.js'], engine.checksum('unmanaged bundle bytes'));
+    assert.equal(healed.product.checksums['vs/loader.js'], 'keep-me', 'unrelated checksums stay untouched');
+    assert.equal(drifted.checksums['vs/code/electron-browser/workbench/workbench.html'], 'old', 'input product must not be mutated');
+    const clean = engine.reconcileChecksums(healed.product, appBase, [htmlPath, bundlePath], readFile);
+    assert.equal(clean.changed.length, 0, 'already-matching checksums produce no writes');
+    const missingKey = engine.reconcileChecksums({ checksums: {} }, appBase, [htmlPath], readFile);
+    assert.deepEqual(missingKey.missing, ['out/vs/code/electron-browser/workbench/workbench.html'], 'files without a checksum key are reported but never checked');
+    assert.equal(missingKey.changed.length, 0);
+    const unreadable = engine.reconcileChecksums(healed.product, appBase, [path.join(appBase, 'out', 'gone.js')], readFile);
+    assert.deepEqual(unreadable.missing, ['out/gone.js'], 'unknown files without keys are missing, not unreadable');
+    const driftNoKey = engine.reconcileChecksums({ checksums: {} }, appBase, [htmlPath], readFile);
+    assert.equal(driftNoKey.product.checksums['out/vs/code/electron-browser/workbench/workbench.html'], undefined, 'no key must be invented for untracked files');
+}
 
 const extensionSource = fs.readFileSync(path.join(__dirname, 'extension.js'), 'utf8');
 new vm.Script(extensionSource, { filename: 'extension.js' });

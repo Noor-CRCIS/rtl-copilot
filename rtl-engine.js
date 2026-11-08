@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const path = require('path');
 
-const VERSION = '3.1.5';
+const VERSION = '3.1.6';
 const PATCH_START = '<!-- RTL-COPILOT:START -->';
 const PATCH_END = '<!-- RTL-COPILOT:END -->';
 const RUNTIME_NAME = 'rtl-copilot-runtime.js';
@@ -458,6 +458,44 @@ function updateWorkbenchChecksum(product, appBase, htmlPath, htmlContent) {
     return { product: updated, key, hash: updated.checksums[key] };
 }
 
+// Repairs the "Your Code installation appears to be corrupt" warning: for
+// every managed file (patched workbench HTML or Monaco bundle) whose stored
+// checksum no longer matches the bytes on disk, rewrite the stored checksum
+// to the actual digest. Files without a checksum key are left untouched,
+// because VS Code integrity only validates keys present in product.json.
+function reconcileChecksums(product, appBase, paths, readFile) {
+    const source = product && typeof product === 'object' ? product : {};
+    const stored = source.checksums && typeof source.checksums === 'object' && !Array.isArray(source.checksums)
+        ? source.checksums
+        : {};
+    const updated = { ...stored };
+    const changed = [];
+    const missing = [];
+    const unreadable = [];
+    for (const filePath of paths) {
+        const relative = path.relative(appBase, filePath).split(path.sep).join('/');
+        if (!relative || relative === '..' || relative.startsWith('../')) continue;
+        const keys = new Set([relative, relative.replace(/^out\//, '')].filter(key => Object.prototype.hasOwnProperty.call(updated, key)));
+        const key = [...keys][0];
+        if (!key) {
+            missing.push(relative);
+            continue;
+        }
+        let actual;
+        try {
+            actual = checksum(readFile(filePath));
+        } catch {
+            unreadable.push(relative);
+            continue;
+        }
+        if (updated[key] !== actual) {
+            changed.push({ key, from: updated[key], to: actual });
+            updated[key] = actual;
+        }
+    }
+    return { product: { ...source, checksums: updated }, changed, missing, unreadable };
+}
+
 function applyEditorBridge(source) {
     if (typeof source !== 'string') throw new Error('Invalid workbench JavaScript source.');
     if (source.includes(EDITOR_BRIDGE)) return source;
@@ -509,4 +547,5 @@ module.exports = {
     removeEditorBridge,
     editorBridgeState,
     updateWorkbenchChecksum,
+    reconcileChecksums,
 };
