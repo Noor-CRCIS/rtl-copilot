@@ -370,7 +370,9 @@ function buildTransaction(htmlPath, enable) {
     const entries = [
         { path: htmlPath, content: htmlContent },
     ];
-    const nativeEditorEnabled = enable && (options.areas.inputs && options.areas.promptInputs || options.areas.editorsCode || options.areas.editorComments);
+    // The bridge registers editors so the manual Ctrl+Shift chord always
+    // works; automatic per-area rendering is decided inside the runtime.
+    const nativeEditorEnabled = enable;
     const candidateBundlePath = findWorkbenchBundle(htmlPath, nativeEditorEnabled);
     let bundlePath = null;
     let bundleContent = null;
@@ -710,11 +712,10 @@ async function onStartup() {
     let ready = engine.markerState(html) === 'valid' && engine.patchedVersion(html) === engine.VERSION;
     if (ready) {
         try {
-            const options = patchOptions();
-            const nativeRequired = options.areas.inputs && options.areas.promptInputs || options.areas.editorsCode || options.areas.editorComments;
-            const expectedRuntime = engine.buildRuntime(options);
+            const nativeRequired = true; // the manual Ctrl+Shift chord needs the bridge whenever the patch is enabled
+            const expectedRuntime = engine.buildRuntime(patchOptions());
             const runtimePath = path.join(path.dirname(found.htmlPath), engine.RUNTIME_NAME);
-            const bundlePath = nativeRequired ? findWorkbenchBundle(found.htmlPath) : findWorkbenchBundle(found.htmlPath, false);
+            const bundlePath = findWorkbenchBundle(found.htmlPath);
             const productInfo = findProductJson(found.htmlPath);
             ready = exists(runtimePath)
                 && fs.readFileSync(runtimePath, 'utf8') === expectedRuntime

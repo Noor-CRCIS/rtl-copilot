@@ -2,7 +2,7 @@
   "name": "rtl-copilot",
   "displayName": "Noor RTL — VS Code, Copilot & AI Chat",
   "description": "راست‌چین هوشمند نور برای فارسی و عربی در VS Code، GitHub Copilot و AI Chat؛ تنظیم مستقل ورودی‌ها، Markdown و کامنت‌های ادیتور.",
-  "version": "3.1.3",
+  "version": "3.1.4",
   "publisher": "Noor-CRCIS",
   "license": "MIT",
   "icon": "icon.png",
@@ -261,7 +261,7 @@
           "type": "boolean",
           "default": true,
           "scope": "application",
-          "description": "کنترل جهت ورودی‌ها و پرامپت؛ تشخیص خودکار مستقل با autoInputDirection به‌صورت پیش‌فرض روشن است. Ctrl+Shift چپ/راست انتخاب دستی جهت را ممکن می‌کند."
+          "description": "کنترل جهت ورودی‌ها و پرامپت؛ تشخیص خودکار مستقل با autoInputDirection به‌صورت پیش‌فرض روشن است. Ctrl+Shift چپ/راست انتخاب دستی جهت را اعمال می‌کند."
         },
         "rtlCopilot.areas.notifications": {
           "type": "boolean",
@@ -375,7 +375,7 @@
           "type": "boolean",
           "default": false,
           "scope": "application",
-          "description": "فعال‌سازی کنترل جهت ادیتور فایل: پیش‌فرض دستی با Ctrl+Shift چپ/راست. جهت خودکار فقط با autoEditorDirection روشن می‌شود."
+          "description": "جهت خودکار خطوط کد ادیتور فایل؛ پیش‌فرض خاموش. کنترل دستی با Ctrl+Shift چپ/راست مستقل از این تنظیم همیشه فعال است."
         },
         "rtlCopilot.areas.editorComments": {
           "type": "boolean",

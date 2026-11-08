@@ -3,6 +3,10 @@
 
 <p align="right" dir="rtl">&#x2067;تازه‌های <strong>Noor RTL — VS Code, Copilot &amp; AI Chat</strong>. راهنمای نصب و تنظیم‌ها در <a href="https://github.com/Noor-CRCIS/rtl-copilot/blob/main/README.md">معرفی افزونه</a> آمده است.&#x2069;</p>
 
+<h2 align="right" dir="rtl">&#x2067;نسخهٔ 3.1.4 — ۸ نوامبر ۲۰۲۶&#x2069;</h2>
+<p align="right" dir="rtl">&#x2067;رفع کارنکردن میان‌بر دستی جهت در ادیتور فایل: کلیدهای <code class="notranslate">Ctrl + Shift</code> همراه با جهت چپ/راست اکنون مستقل از تنظیم <code class="notranslate">rtlCopilot.areas.editorsCode</code> همیشه کار می‌کنند؛ آن تنظیم فقط جهت خودکار خطوط کد را روشن می‌کند.&#x2069;</p>
+<p align="right" dir="rtl">&#x2067;افزودن حالت مستقیم کلیدهای جهت‌دار: <code class="notranslate">Ctrl + Shift + Right</code> بلافاصله RTL و <code class="notranslate">Ctrl + Shift + Left</code> بلافاصله LTR می‌شود؛ حالت قبلی (نگه‌داشتن <code class="notranslate">Ctrl + Shift</code> و فشردن شیفت چپ یا راست) همچنان کار می‌کند. در macOS، <code class="notranslate">Command</code> جایگزین <code class="notranslate">Ctrl</code> می‌شود.&#x2069;</p>
+
 <h2 align="right" dir="rtl">&#x2067;نسخهٔ 3.1.3 — ۷ نوامبر ۲۰۲۶&#x2069;</h2>
 <p align="right" dir="rtl">&#x2067;رفع کندی و خالی‌شدن محتوای چت: قواعد فونت به‌جای هزاران انتخابگر گران‌قیمتِ دارای `:has()`، اکنون روی ظرف‌های محتوا اعمال می‌شوند و فرزندان با ارث‌بری عادی فونت را می‌گیرند؛ حجم و هزینهٔ تطبیق CSS حدود ۵ برابر کمتر شد.&#x2069;</p>
 <p align="right" dir="rtl">&#x2067;ادیتورها، ترمینال، فرمول‌ها و آیکون‌ها همچنان فونت خود را نگه می‌دارند و بلاک‌های کدِ ساده، فونت ادیتور را حفظ می‌کنند.&#x2069;</p>

@@ -113,7 +113,10 @@ assert.equal(f.collections[1].values.length, 0);
 const off = runtime({ areas: { editorComments: false, editorsCode: false, inputs: false } });
 const unregistered = editorFixture(model);
 off.context.__rtlCopilotRegisterEditor(unregistered.editor);
-assert.equal(unregistered.collections.length, 0, 'editor features can all be disabled');
+// With every editor area off, nothing is rendered automatically, but the
+// editor is still registered so the manual Ctrl+Shift chord can act on it.
+assert.equal(unregistered.collections.length, 1, 'manual chord keeps file editors registered even when areas are off');
+assert.equal(unregistered.collections[0].values.length, 0, 'disabled areas must not render automatic direction');
 
 function inputFixture(zone, value, find = false) {
     const attrs = new Map();

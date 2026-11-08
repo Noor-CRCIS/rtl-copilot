@@ -59,6 +59,13 @@ function harness({ prompt = false, autoEditorDirection = false, autoInputDirecti
             drain();
             return prevented;
         },
+        arrow(key, ctrlKey = true) {
+            let prevented = false;
+            context.__test.manualDirection({ code: key, key, ctrlKey, shiftKey: true, altKey: false, metaKey: false,
+                target: dom, preventDefault() { prevented = true; }, stopPropagation() {} });
+            drain();
+            return prevented;
+        },
     };
 }
 
@@ -97,6 +104,19 @@ for (const prompt of [false, true]) {
     h.events.Dispose();
     h.drain();
 }
+{
+    // Default options (editorsCode off, editorComments on): the manual
+    // Ctrl+Shift chord must still control file-editor lines, because it is an
+    // explicit user action; editorsCode only gates automatic rendering.
+    const h = harness({ areas: { editorsCode: false, editorComments: true } });
+    assert.equal(h.key('ShiftRight'), true, 'manual chord works with default areas');
+    assert.equal(h.writes.at(-1)[0].options.textDirection, 1, 'default-options file editor honors manual RTL');
+    h.arrow('ArrowLeft');
+    assert.equal(h.writes.at(-1)[0].options.textDirection, 0, 'Ctrl+Shift+ArrowLeft sets LTR directly');
+    h.arrow('ArrowRight');
+    assert.equal(h.writes.at(-1)[0].options.textDirection, 1, 'Ctrl+Shift+ArrowRight sets RTL directly');
+    assert.equal(h.key('ShiftRight', false), false, 'plain Shift still types normally');
+}
 for (const prompt of [false, true]) {
     const h = harness({ prompt, autoEditorDirection: true });
     assert.ok(h.writes.length > 0, 'opt-in retains the former automatic mode');
@@ -128,8 +148,9 @@ assert.equal(manualInput.writes.length, 0, 'automatic file editor does not overr
 const disabledInput = harness({ prompt: true, areas: { inputs: false } });
 assert.equal(disabledInput.events.FocusEditorText, undefined, 'disabled input area wins over default auto input');
 const disabled = harness({ areas: { editorsCode: false, inputs: false } });
-assert.equal(disabled.writes.length, 0);
-assert.equal(disabled.events.FocusEditorText, undefined, 'disabled editor area stays untouched');
+assert.equal(disabled.writes.length, 0, 'disabled areas must not trigger automatic direction');
+assert.equal(disabled.key('ShiftRight'), true, 'manual chord works even with all editor areas disabled');
+assert.equal(disabled.writes.at(-1)[0].options.textDirection, 1, 'manual override still applies when areas are off');
 
 const h = harness();
 const newBlock = { nodeType: 1, closest: () => null };
