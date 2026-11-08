@@ -388,10 +388,29 @@ assert.match(extensionSource, /function unsupportedInstallMessage\(filePath\)/);
 assert.match(extensionSource, /نسخهٔ Snap روی فایلسیستم فقطخواندنی نصب شده و قابل پچ نیست/);
 assert.match(extensionSource, /https:\/\/code\.visualstudio\.com\/Download/);
 assert.match(extensionSource, /assertWritableInstallation\(found\.htmlPath\)/);
-assert.doesNotMatch(extensionSource, /workbench\.action\.quit/);
-assert.match(extensionSource, /workbench\.action\.reloadWindow/);
-assert.match(extensionSource, /'Reload Window'/);
+assert.match(extensionSource, /workbench\.action\.quit/);
+assert.doesNotMatch(extensionSource, /workbench\.action\.reloadWindow/);
+assert.match(extensionSource, /'بستن VS Code'/);
 assert.doesNotMatch(extensionSource, /scheduleWindowsRelaunch/);
+// Execute the transaction's bundle branch with an already-patched bundle
+// and stale product checksum: no bundle write, but checksum and verification
+// metadata must still be refreshed on every reinstall.
+{
+    const start = extensionSource.indexOf('    let bundlePath = null;', extensionSource.indexOf('function buildTransaction('));
+    const end = extensionSource.indexOf('    if (bundleWarning) log(', start);
+    assert.ok(start > 0 && end > start);
+    const run = new Function('engine', 'fs', 'candidateBundlePath', 'productInfo', 'updatedProduct',
+        `const nativeEditorEnabled = true; let bundleWarning = null; const entries = [];
+        ${extensionSource.slice(start, end)}
+        return { updatedProduct, entries, bundlePath, bundleChecksum };`);
+    const bytes = engine.applyEditorBridge('a.addCodeEditor(this);');
+    const result = run(engine, { readFileSync: () => bytes }, bundlePath,
+        { appBase }, { checksums: originalChecksums });
+    assert.equal(result.updatedProduct.checksums['vs/workbench/workbench.desktop.main.js'], engine.checksum(bytes));
+    assert.equal(result.entries.length, 0, 'unchanged bundle must not be rewritten');
+    assert.equal(result.bundlePath, bundlePath, 'unchanged bundle must still be verified');
+    assert.ok(result.bundleChecksum);
+}
 assert.doesNotMatch(extensionSource, /\bspawn\(/);
 assert.match(extensionSource, /Previously enabled patch is missing or outdated; repairing the installation\./);
 assert.match(extensionSource, /پچ نیاز به نصب مجدد دارد\./);

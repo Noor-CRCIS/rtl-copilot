@@ -446,13 +446,15 @@ function buildTransaction(htmlPath, enable) {
             if (!nativeEditorEnabled) throw error;
             bundleWarning = error.message;
         }
-        if (nextBundle !== originalBundle) {
+        // Reinstall must repair a stale checksum even if the bridge is
+        // already present and no bundle bytes need changing.
+        if (!bundleWarning) {
             bundlePath = candidateBundlePath;
             bundleContent = nextBundle;
             bundleBytes = Buffer.from(bundleContent, 'utf8');
             bundleChecksum = engine.updateWorkbenchChecksum(updatedProduct, productInfo.appBase, bundlePath, bundleContent);
             updatedProduct = bundleChecksum.product;
-            entries.push({ path: bundlePath, content: bundleBytes });
+            if (nextBundle !== originalBundle) entries.push({ path: bundlePath, content: bundleBytes });
         }
     } else if (nativeEditorEnabled && !bundleWarning) {
         bundleWarning = 'bundle سازگار workbench.desktop.main.js برای RTL بومی Monaco پیدا نشد.';
@@ -545,11 +547,11 @@ function refreshStatusBar() {
 
 async function promptFullRestart(message) {
     const choice = await vscode.window.showInformationMessage(
-        `${message} برای بارگذاری تغییرات، پنجره را دوباره بارگذاری کنید.`,
-        'Reload Window', 'بعداً', 'Log',
+        `${message} برای بارگذاری تغییرات و checksum جدید، همهٔ پنجره‌های VS Code را کاملاً ببندید و برنامه را دوباره باز کنید. Reload Window کافی نیست.`,
+        'بستن VS Code', 'بعداً', 'Log',
     );
     if (choice === 'Log') return outputChannel.show(true);
-    if (choice === 'Reload Window') await vscode.commands.executeCommand('workbench.action.reloadWindow');
+    if (choice === 'بستن VS Code') await vscode.commands.executeCommand('workbench.action.quit');
 }
 
 async function doPatch(enable, quiet = false) {
@@ -774,12 +776,29 @@ async function cmdSelectFont() {
         matchOnDescription: true,
     });
     if (!picked) return;
+    let size;
+    if (!picked.reset) {
+        const value = await vscode.window.showInputBox({
+            title: 'RTL chat font size',
+            prompt: 'Font size in pixels (9–96). Code blocks keep their editor font size.',
+            value: String(cfg.get('font.size', 14)),
+            validateInput: value => {
+                const number = Number(value.trim());
+                return value.trim() && Number.isFinite(number) && number >= 9 && number <= 96
+                    ? undefined : 'Enter a font size between 9 and 96 pixels.';
+            },
+        });
+        // Cancel the entire selection before persisting either setting.
+        if (value === undefined) return;
+        size = Number(value.trim());
+    }
     const target = vscode.ConfigurationTarget.Global;
     if (picked.reset) {
         await cfg.update('font.family', '', target);
         await cfg.update('font.enabled', false, target);
     } else {
         await cfg.update('font.family', picked.family, target);
+        await cfg.update('font.size', size, target);
         await cfg.update('font.enabled', true, target);
     }
     const choice = await vscode.window.showInformationMessage(
