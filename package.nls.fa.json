@@ -7,6 +7,7 @@
 	"rtlCopilot.command.status": "ℹ️ نمایش وضعیت پچ",
 	"rtlCopilot.command.configureAreas": "⚙️ فعال/غیرفعال‌کردن بخش‌های RTL",
 	"rtlCopilot.command.selectFont": "🅰️ انتخاب فونت چت…",
+	"rtlCopilot.command.selectFontSize": "🔠 انتخاب اندازهٔ فونت چت…",
 	"rtlCopilot.command.reinstall": "🔁 نصب مجدد پچ",
 	"rtlCopilot.command.backup": "💾 پشتیبان‌گیری کامل",
 	"rtlCopilot.command.restore": "↩️ بازگرداندن کامل فایل‌های اصلی",

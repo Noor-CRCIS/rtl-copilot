@@ -9,6 +9,18 @@
 const { execFile } = require('node:child_process');
 const os = require('os');
 
+// Preference stacks, not bundled fonts or guarantees of installed families.
+const FALLBACK_PRESETS = [
+    { label: 'خوانا برای فارسی — Tahoma', family: 'Tahoma, Arial, sans-serif' },
+    { label: 'رابط کاربری — Segoe UI', family: '"Segoe UI", Tahoma, Arial, sans-serif' },
+    { label: 'ساده و آشنا — Arial', family: 'Arial, Tahoma, sans-serif' },
+];
+
+function installedFamilyStack(name) {
+    const quoted = name.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    return `"${quoted}", Tahoma, Arial, sans-serif`;
+}
+
 // Well-known Persian / Arabic fonts are ranked first so the picker presents
 // the most useful choices (and gives a sensible default) for RTL users.
 const PERSIAN_FONTS = [
@@ -135,6 +147,8 @@ function defaultFamily(families) {
 }
 
 module.exports = {
+    FALLBACK_PRESETS,
+    installedFamilyStack,
     PERSIAN_FONTS,
     listInstalledFonts,
     defaultFamily,

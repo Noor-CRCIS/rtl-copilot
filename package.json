@@ -98,6 +98,11 @@
         "category": "%rtlCopilot.category%"
       },
       {
+        "command": "rtlCopilot.selectFontSize",
+        "title": "%rtlCopilot.command.selectFontSize%",
+        "category": "%rtlCopilot.category%"
+      },
+      {
         "command": "rtlCopilot.reinstall",
         "title": "%rtlCopilot.command.reinstall%",
         "category": "%rtlCopilot.category%"
@@ -454,6 +459,9 @@
           "command": "rtlCopilot.selectFont"
         },
         {
+          "command": "rtlCopilot.selectFontSize"
+        },
+        {
           "command": "rtlCopilot.reinstall"
         },
         {
@@ -475,7 +483,7 @@
     }
   },
   "scripts": {
-    "test": "node test-engine.cjs && node test-native-direction.cjs && node test-comment-input.cjs && node test-font-coverage.cjs && node test-privileged-write.cjs && node test-docs.cjs && node test-fonts-uninstall.cjs",
+    "test": "node test-engine.cjs && node test-native-direction.cjs && node test-comment-input.cjs && node test-font-coverage.cjs && node test-font-commands.cjs && node test-privileged-write.cjs && node test-docs.cjs && node test-fonts-uninstall.cjs",
     "package": "vsce package --no-dependencies --allow-missing-repository",
     "vscode:uninstall": "node ./uninstall.js"
   },

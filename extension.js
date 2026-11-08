@@ -767,38 +767,37 @@ async function cmdSelectFont() {
     const cfg = vscode.workspace.getConfiguration(EXT_ID);
     const current = (cfg.get('font.family', '') || '').trim();
     const items = [
-        { label: '$(close) ' + vscode.l10n.t('حالت پیشفرض (فونت ادیتور)'), description: current ? '' : vscode.l10n.t('فعلی'), reset: true },
+        { label: '$(discard) بازنشانی تایپوگرافی VS Code', description: 'حذف فونت، اندازه و فاصلهٔ خطوط سفارشی', reset: true },
         ...(current ? [{ label: '$(check) ' + current, description: vscode.l10n.t('فعلی'), family: current }] : []),
-        ...families.map(family => ({ label: family, description: family === current ? vscode.l10n.t('فعلی') : undefined, family })),
+        { label: 'ترکیب‌های جایگزین', kind: vscode.QuickPickItemKind.Separator },
+        ...fonts.FALLBACK_PRESETS.map(preset => ({
+            ...preset,
+            description: 'ترکیب جایگزین؛ نه تضمین نصب فونت',
+            detail: preset.family,
+        })),
+        ...(families.length ? [{ label: 'فونت‌های نصب‌شده', kind: vscode.QuickPickItemKind.Separator }] : []),
+        ...families.map(name => ({
+            label: name,
+            description: fonts.PERSIAN_FONTS.some(font => font.toLowerCase() === name.toLowerCase())
+                ? 'نصب‌شده؛ پیشنهادی برای فارسی' : 'نصب‌شده',
+            family: fonts.installedFamilyStack(name),
+            detail: fonts.installedFamilyStack(name),
+        })),
     ];
     const picked = await vscode.window.showQuickPick(items, {
-        placeHolder: vscode.l10n.t('فونت فارسی/لاتین برای چت RTL را انتخاب کنید…'),
+        placeHolder: 'انتخاب فونت؛ اگر فونت اول موجود نباشد، از جایگزین استفاده می‌شود',
         matchOnDescription: true,
+        matchOnDetail: true,
     });
     if (!picked) return;
-    let size;
-    if (!picked.reset) {
-        const value = await vscode.window.showInputBox({
-            title: 'RTL chat font size',
-            prompt: 'Font size in pixels (9–96). Code blocks keep their editor font size.',
-            value: String(cfg.get('font.size', 14)),
-            validateInput: value => {
-                const number = Number(value.trim());
-                return value.trim() && Number.isFinite(number) && number >= 9 && number <= 96
-                    ? undefined : 'Enter a font size between 9 and 96 pixels.';
-            },
-        });
-        // Cancel the entire selection before persisting either setting.
-        if (value === undefined) return;
-        size = Number(value.trim());
-    }
     const target = vscode.ConfigurationTarget.Global;
     if (picked.reset) {
-        await cfg.update('font.family', '', target);
+        for (const key of ['font.family', 'font.size', 'font.lineHeight']) {
+            await cfg.update(key, undefined, target);
+        }
         await cfg.update('font.enabled', false, target);
     } else {
         await cfg.update('font.family', picked.family, target);
-        await cfg.update('font.size', size, target);
         await cfg.update('font.enabled', true, target);
     }
     const choice = await vscode.window.showInformationMessage(
@@ -807,6 +806,32 @@ async function cmdSelectFont() {
     );
     if (choice === vscode.l10n.t('نصب مجدد')) {
         await safeRun(() => doPatch(true), 'reinstall-after-font');
+    }
+}
+
+async function cmdSelectFontSize() {
+    const cfg = vscode.workspace.getConfiguration(EXT_ID);
+    const validateInput = value => {
+        const number = Number(value.trim());
+        return value.trim() && Number.isFinite(number) && number >= 9 && number <= 96
+            ? undefined : 'Enter a font size between 9 and 96 pixels.';
+    };
+    const value = await vscode.window.showInputBox({
+        title: 'RTL chat font size',
+        prompt: 'Font size in pixels (9–96). Code blocks keep their editor font size.',
+        value: String(cfg.get('font.size', 14)),
+        validateInput,
+    });
+    if (value === undefined || validateInput(value)) return;
+    const target = vscode.ConfigurationTarget.Global;
+    await cfg.update('font.size', Number(value.trim()), target);
+    await cfg.update('font.enabled', true, target);
+    const choice = await vscode.window.showInformationMessage(
+        vscode.l10n.t('فونت چت بهروزرسانی شد. برای اعمال، پچ را دوباره نصب کنید.'),
+        vscode.l10n.t('نصب مجدد')
+    );
+    if (choice === vscode.l10n.t('نصب مجدد')) {
+        await safeRun(() => doPatch(true), 'reinstall-after-font-size');
     }
 }
 
@@ -908,6 +933,7 @@ function activate(context) {
         fixChecksum: cmdFixChecksum,
         configureAreas: cmdConfigureAreas,
         selectFont: cmdSelectFont,
+        selectFontSize: cmdSelectFontSize,
     };
     for (const [name, handler] of Object.entries(commands)) {
         context.subscriptions.push(vscode.commands.registerCommand(`${EXT_ID}.${name}`, handler));

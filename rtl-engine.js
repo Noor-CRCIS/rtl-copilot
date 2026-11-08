@@ -160,7 +160,8 @@ function safeFontFamily(value) {
         } else {
             const name = /^(".*"|'.*')$/u.test(part) ? part.slice(1, -1).trim() : part;
             if (!name || !/^[\p{L}\p{N}\p{M} _.-]+$/u.test(name)) return '';
-            families.push(`"${name}"`);
+            const generic = /^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-serif|ui-sans-serif|ui-monospace|ui-rounded|math|fangsong)$/i.test(part);
+            families.push(generic ? part.toLowerCase() : `"${name}"`);
         }
         expectName = !expectName;
     }

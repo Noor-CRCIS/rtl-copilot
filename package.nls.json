@@ -7,6 +7,7 @@
 	"rtlCopilot.command.status": "ℹ️ Show patch status",
 	"rtlCopilot.command.configureAreas": "⚙️ Enable/disable RTL areas",
 	"rtlCopilot.command.selectFont": "🅰️ Select chat font…",
+	"rtlCopilot.command.selectFontSize": "🔠 Select chat font size…",
 	"rtlCopilot.command.reinstall": "🔁 Reinstall patch",
 	"rtlCopilot.command.backup": "💾 Full backup",
 	"rtlCopilot.command.restore": "↩️ Restore original files",
