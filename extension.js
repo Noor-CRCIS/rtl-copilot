@@ -12,6 +12,7 @@ const EXT_ID = 'rtlCopilot';
 const EXT_LABEL = 'راست‌چین هوشمند نور';
 const BACKUP_SUFFIX = '.rtl-backup';
 const KEY_DISABLED = 'userDisabled';
+const KEY_RESTART_PENDING = 'productRestartPending';
 let outputChannel = null;
 let statusBarItem = null;
 let extensionContext = null;
@@ -98,6 +99,13 @@ function findWorkbenchHtml() {
         const manualCandidates = workbenchCandidates(manualPath);
         if (manualCandidates[0]) return { htmlPath: manualCandidates[0], variant: 'Manual directory' };
     }
+    // appRoot identifies the running application, unlike unordered update/hash
+    // directories. A remote/server root without desktop HTML must not fall
+    // through to an unrelated locally installed desktop application.
+    if (vscode.env && vscode.env.appRoot) {
+        const active = workbenchCandidates(vscode.env.appRoot);
+        return active[0] ? { htmlPath: active[0], variant: 'vscode.env.appRoot' } : null;
+    }
     for (const root of getInstallRoots()) {
         const direct = workbenchCandidates(root.dir);
         if (direct[0]) return { htmlPath: direct[0], variant: root.label };
@@ -125,26 +133,12 @@ function findProductJson(htmlPath) {
     return null;
 }
 
-// Windows installs can keep several product.json files (hash-dir staging
-// directories plus the running install). VS Code integrity reads the one in
-// the tree it actually boots from, so checksum repair must consider them all.
+// Only the nearest product owns this workbench. Ancestor products are not
+// evidence of another running installation and must never be rewritten.
 function findAllProductJson(htmlPath) {
-    const results = [];
-    let dir = path.dirname(htmlPath);
-    for (let depth = 0; depth < 16; depth += 1) {
-        const productPath = path.join(dir, 'product.json');
-        if (exists(productPath)) {
-            try {
-                results.push({ productPath, appBase: dir, data: JSON.parse(fs.readFileSync(productPath, 'utf8')) });
-            } catch (error) {
-                log(`skipping unreadable product.json ${productPath}: ${error.message}`);
-            }
-        }
-        const parent = path.dirname(dir);
-        if (parent === dir) break;
-        dir = parent;
-    }
-    return results;
+    const product = findProductJson(htmlPath);
+    if (!product) throw new Error('No product.json owns the selected workbench.');
+    return [product];
 }
 
 function managedChecksumPaths(htmlPath) {
@@ -158,23 +152,36 @@ function managedChecksumPaths(htmlPath) {
     return targets;
 }
 
-// Rewrites stored checksums to the real digests of the files this extension
-// manages (patched workbench HTML and Monaco bundle). This is what clears the
-// "Your Code installation appears to be corrupt" warning after a patch, an
-// interrupted write, or a partial VS Code update. Only keys that already
-// exist in product.json are touched; unmanaged checksums keep their values.
+// Repair through the same provenance checks, read-back and rollback as install.
+// A marker alone is not evidence that arbitrary bytes are safe to checksum.
 async function reconcileChecksumsForInstall(htmlPath) {
-    const targets = managedChecksumPaths(htmlPath);
-    let changedTotal = 0;
-    for (const productInfo of findAllProductJson(htmlPath)) {
-        const result = engine.reconcileChecksums(productInfo.data, productInfo.appBase, targets, p => fs.readFileSync(p));
-        if (!result.changed.length) continue;
-        const productContent = `${JSON.stringify(result.product, null, 2)}\n`;
-        await writeEntries([{ path: productInfo.productPath, content: productContent }], productInfo.appBase);
-        changedTotal += result.changed.length;
-        log(`checksums reconciled in ${productInfo.productPath}: ${result.changed.map(entry => entry.key).join(', ')}`);
+    const info = findAllProductJson(htmlPath)[0];
+    const probe = engine.reconcileChecksums(info.data, info.appBase, managedChecksumPaths(htmlPath), p => fs.readFileSync(p));
+    log(`Integrity on disk: product=${info.productPath}; mismatches=${JSON.stringify(probe.changed)}; missing=${probe.missing}; unreadable=${probe.unreadable}. This does not inspect the running process's cached product.`);
+    if (probe.missing.length || probe.unreadable.length) throw new Error('Incomplete integrity evidence; see Log.');
+    if (!probe.changed.length) return 0;
+    const transaction = buildTransaction(htmlPath, engine.markerState(fs.readFileSync(htmlPath, 'utf8')) === 'valid');
+    await executeTransaction(transaction, transaction.enable);
+    return probe.changed.length;
+}
+
+function assertChecksumSource(filePath, productInfo, removePatch) {
+    const bytes = fs.readFileSync(filePath);
+    const key = engine.checksumKey(productInfo.appBase, filePath, productInfo.data.checksums);
+    if (productInfo.data.checksums[key] === engine.checksum(bytes)) return;
+    // A stale checksum is repairable only when the unpatched bytes agree with
+    // a checksum-validated stock backup, not merely with recognizable markers.
+    const backupPath = filePath + BACKUP_SUFFIX;
+    const productBackup = productInfo.productPath + BACKUP_SUFFIX;
+    if (exists(backupPath) && exists(productBackup)) {
+        const backup = fs.readFileSync(backupPath);
+        const product = JSON.parse(fs.readFileSync(productBackup, 'utf8'));
+        const backupKey = engine.checksumKey(productInfo.appBase, filePath, product.checksums);
+        const stock = removePatch(backup.toString('utf8'));
+        if (Buffer.from(stock).equals(backup) && product.checksums[backupKey] === engine.checksum(backup)
+            && Buffer.from(removePatch(bytes.toString('utf8'))).equals(backup)) return;
     }
-    return changedTotal;
+    throw new Error(`Unverified checksum source: ${filePath}. Restore a trusted VS Code installation; refusing to bless modified bytes.`);
 }
 
 function findWorkbenchBundle(htmlPath, requireCompatible = true) {
@@ -412,6 +419,7 @@ function buildTransaction(htmlPath, enable) {
     const runtimePath = path.join(path.dirname(htmlPath), engine.RUNTIME_NAME);
     const productInfo = findProductJson(htmlPath);
     if (!productInfo) throw new Error('product.json متناظر با workbench پیدا نشد.');
+    assertChecksumSource(htmlPath, productInfo, engine.removePatchFromHtml);
     const options = patchOptions();
     const htmlContent = enable
         ? engine.applyPatchToHtml(originalHtml, options)
@@ -438,6 +446,7 @@ function buildTransaction(htmlPath, enable) {
     let bundleBytes = null;
     let bundleChecksum = null;
     if (candidateBundlePath) {
+        assertChecksumSource(candidateBundlePath, productInfo, engine.removeEditorBridge);
         const originalBundle = fs.readFileSync(candidateBundlePath, 'utf8');
         let nextBundle = originalBundle;
         try {
@@ -461,12 +470,13 @@ function buildTransaction(htmlPath, enable) {
     }
     if (bundleWarning) log(`WARN Monaco bridge unavailable; installing without it: ${bundleWarning}`);
     const productContent = `${JSON.stringify(updatedProduct, null, 2)}\n`;
-    if (productContent !== fs.readFileSync(productInfo.productPath, 'utf8')) {
+    const changedProduct = JSON.stringify(updatedProduct.checksums) !== JSON.stringify(productInfo.data.checksums);
+    if (changedProduct) {
         entries.push({ path: productInfo.productPath, content: productContent });
     }
     if (enable) entries.push({ path: runtimePath, content: engine.buildRuntime(options) });
     else if (exists(runtimePath)) entries.push({ path: runtimePath, operation: 'delete' });
-    return { entries, htmlPath, htmlContent, runtimePath, productInfo, checksumResult, bundlePath, bundleContent, bundleBytes, bundleChecksum, bundleEnabled: nativeEditorEnabled, bundleWarning, enable };
+    return { entries, changedProduct, htmlPath, htmlContent, runtimePath, productInfo, checksumResult, bundlePath, bundleContent, bundleBytes, bundleChecksum, bundleEnabled: nativeEditorEnabled, bundleWarning, enable };
 }
 
 function verifyTransaction(transaction, enabled) {
@@ -519,6 +529,13 @@ async function executeTransaction(transaction, enabled) {
         }
         throw error;
     }
+    if (transaction.changedProduct) await rememberProductChange(transaction.productInfo.productPath);
+}
+
+async function rememberProductChange(productPath) {
+    // Do not infer a main-process restart from extension activation/sessionId.
+    // A renderer reload or extension-host restart is not sufficient evidence.
+    await extensionContext.globalState.update(KEY_RESTART_PENDING, { productPath, changedAt: Date.now() });
 }
 
 function setStatusBar(active) {
@@ -546,12 +563,26 @@ function refreshStatusBar() {
 }
 
 async function promptFullRestart(message) {
+    const pending = extensionContext.globalState.get(KEY_RESTART_PENDING);
+    const later = vscode.l10n.t('بعداً');
+    if (pending) {
+        const quit = vscode.l10n.t('بستن برنامه');
+        const choice = await vscode.window.showInformationMessage(
+            `${message} ${vscode.l10n.t('کارها را ذخیره کنید؛ همهٔ پنجره‌های برنامه را ببندید و دوباره باز کنید. بازخوانی پنجره کافی نیست.')}`,
+            quit, later,
+        );
+        if (choice === quit) {
+            // Keep pending state if quit is cancelled, vetoed or fails.
+            await vscode.commands.executeCommand('workbench.action.quit');
+        }
+        return;
+    }
+    const reload = vscode.l10n.t('بازخوانی پنجره');
     const choice = await vscode.window.showInformationMessage(
-        `${message} برای بارگذاری تغییرات و checksum جدید، همهٔ پنجره‌های VS Code را کاملاً ببندید و برنامه را دوباره باز کنید. Reload Window کافی نیست.`,
-        'بستن VS Code', 'بعداً', 'Log',
+        `${message} ${vscode.l10n.t('برای اعمال تغییرات، پنجره را بازخوانی کنید.')}`,
+        reload, later,
     );
-    if (choice === 'Log') return outputChannel.show(true);
-    if (choice === 'بستن VS Code') await vscode.commands.executeCommand('workbench.action.quit');
+    if (choice === reload) await vscode.commands.executeCommand('workbench.action.reloadWindow');
 }
 
 async function doPatch(enable, quiet = false) {
@@ -634,6 +665,8 @@ function cmdStatus() {
         let mismatch = 0;
         for (const info of findAllProductJson(found.htmlPath)) {
             const probe = engine.reconcileChecksums(info.data, info.appBase, targets, p => fs.readFileSync(p));
+            log(`Integrity on disk: product=${info.productPath}; mismatches=${JSON.stringify(probe.changed)}; missing=${probe.missing}; unreadable=${probe.unreadable}`);
+            if (probe.missing.length || probe.unreadable.length) throw new Error('Incomplete checksum evidence; see Log.');
             mismatch += probe.changed.length;
         }
         if (mismatch) checksumLine = `checksum: ⚠️ ${mismatch} مورد ناسازگار — اخطار corrupt طبیعی است`;
@@ -688,7 +721,26 @@ function cmdFixChecksum() {
         assertWritableInstallation(found.htmlPath);
         const changed = await reconcileChecksumsForInstall(found.htmlPath);
         if (!changed) {
-            vscode.window.showInformationMessage(`${EXT_LABEL}: همهٔ checksumها با فایل‌های فعلی مطابقت دارند. اگر همچنان اخطار «corrupt» می‌بینید، ابتدا «نصب مجدد پچ» و سپس Reload Window را امتحان کنید.`);
+            const pending = extensionContext.globalState.get(KEY_RESTART_PENDING);
+            if (pending) {
+                // Only an explicit acknowledgement can clear durable pending state.
+                // Disk hashes and extension-host activation cannot prove a full exit.
+                const choice = await vscode.window.showQuickPick([
+                    { label: vscode.l10n.t('بعداً'), action: 'later' },
+                    { label: vscode.l10n.t('قبلاً بستم و باز کردم'), action: 'acknowledge',
+                        detail: vscode.l10n.t('همهٔ پنجره‌های برنامه را کامل بسته‌ام و دوباره باز کرده‌ام؛ نه فقط بازخوانی پنجره.') },
+                    { label: vscode.l10n.t('راهنمای خروج'), action: 'restart' },
+                ], {
+                    title: vscode.l10n.t('تأیید خروج کامل'),
+                    placeHolder: vscode.l10n.t('این تأیید فقط یادآوری خروج را پاک می‌کند؛ بررسی سلامت نصب نیست.'),
+                });
+                if (choice?.action === 'acknowledge' && extensionContext.globalState.get(KEY_RESTART_PENDING) === pending) {
+                    await extensionContext.globalState.update(KEY_RESTART_PENDING, undefined);
+                }
+                if (choice?.action === 'restart') await promptFullRestart(`${EXT_LABEL}: چکسام فایل‌های مدیریت‌شده مطابق است.`);
+                return true;
+            }
+            vscode.window.showInformationMessage(`${EXT_LABEL}: ${vscode.l10n.t('چکسام فایل‌های مدیریت‌شده مطابق است؛ سایر فایل‌ها و حافظهٔ برنامه بررسی نشده‌اند.')}`);
             return true;
         }
         await promptFullRestart(`${EXT_LABEL}: ${changed} checksum ناسازگار با فایل‌های فعلی اصلاح شد.`);
@@ -737,7 +789,9 @@ function cmdRestore() {
             ...(bundlePath && exists(bundleBackup) ? [{ path: bundlePath, content: fs.readFileSync(bundleBackup) }] : []),
             { path: runtimePath, operation: 'delete' },
         ];
+        const changedProduct = JSON.stringify(product.data.checksums) !== JSON.stringify(cleanProduct.checksums);
         await writeEntries(restoreEntries, product.appBase);
+        if (changedProduct) await rememberProductChange(product.productPath);
         await extensionContext.globalState.update(KEY_DISABLED, true);
         setStatusBar(false);
         await promptFullRestart(`${EXT_LABEL}: فایلهای اصلی بازگردانی شدند.`);
@@ -849,6 +903,12 @@ function showDiagnostics() {
 }
 
 async function onStartup() {
+    if (extensionContext.globalState.get(KEY_RESTART_PENDING)) {
+        log('Full application restart pending. Reload does not refresh cached product. Use Fix Checksum to review restart choices or confirm a completed full exit/reopen. Startup repair deferred.');
+        refreshStatusBar();
+        if (statusBarItem) statusBarItem.tooltip = 'Full restart pending — run RTL: Fix Checksum to review. No automatic reload.';
+        return;
+    }
     const disabled = extensionContext.globalState.get(KEY_DISABLED, false);
     const autoApply = globalSetting('autoApply', true);
     log(`startup disabled=${disabled} autoApply=${autoApply}`);
@@ -888,10 +948,6 @@ async function onStartup() {
         } catch { ready = false; }
     }
     if (ready) {
-        // A valid patch with drifted checksums still triggers VS Code's
-        // "installation appears to be corrupt" warning; heal it silently.
-        try { await reconcileChecksumsForInstall(found.htmlPath); }
-        catch (error) { log(`checksum reconcile failed: ${error.message}`); }
         return setStatusBar(true);
     }
     // Repair only installations explicitly enabled by the user. A fresh

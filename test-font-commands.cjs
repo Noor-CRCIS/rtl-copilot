@@ -61,6 +61,30 @@ function harness({ value, pick, reinstall = false, initial = {}, installed = ['T
 }
 
 (async () => {
+    const extensionSource = fs.readFileSync(path.join(__dirname, 'extension.js'), 'utf8');
+    const promptSource = extensionSource.slice(extensionSource.indexOf('async function promptFullRestart('), extensionSource.indexOf('\nasync function doPatch('));
+    for (const choice of ['بازخوانی پنجره', 'بعداً', undefined]) {
+        const executed = [];
+        const logs = [];
+        const prompt = vm.runInNewContext(`${promptSource}; promptFullRestart`, {
+            extensionContext: { globalState: { get: () => undefined } },
+            KEY_RESTART_PENDING: 'productRestartPending',
+            vscode: {
+                l10n: { t: text => text },
+                window: { showInformationMessage: async (message, ...actions) => {
+                    assert.deepEqual(actions, ['بازخوانی پنجره', 'بعداً']);
+                    assert.ok(message.startsWith('Patched. '));
+                    assert.ok(message.includes('برای اعمال تغییرات، پنجره را بازخوانی کنید.'));
+                    return choice;
+                } },
+                commands: { executeCommand: async command => executed.push(command) },
+            },
+            outputChannel: { show: preserveFocus => logs.push(preserveFocus) },
+        });
+        await prompt('Patched.');
+        assert.deepEqual(executed, choice === 'بازخوانی پنجره' ? ['workbench.action.reloadWindow'] : []);
+        assert.deepEqual(logs, []);
+    }
     for (const value of [undefined, '', '   ', 'abc', 'NaN', 'Infinity', '-Infinity', '8.99', '96.01', '0']) {
         const test = harness({ value, reinstall: true });
         await test.run('selectFontSize');

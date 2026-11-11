@@ -6,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const engine = require('./rtl-engine');
 
-assert.equal(engine.VERSION, '3.1.6');
+assert.equal(engine.VERSION, '3.1.9');
 const font = { enabled: true, family: '"Vazirmatn", \'Noto Sans Arabic\'', size: 18, lineHeight: 1.8 };
 assert.equal(engine.normalizeOptions({ font }).font.family, '"Vazirmatn", "Noto Sans Arabic"');
 for (const family of ['Arial; color:red', 'Arial}body{display:none}', '</style><script>x</script>', 'url(evil)', 'Arial\\22', 'Arial,,serif', '"unterminated', 'Arial,']) {
@@ -16,24 +16,16 @@ for (const family of ['Arial; color:red', 'Arial}body{display:none}', '</style><
 assert.ok(!engine.buildCss().includes('font-family:'));
 assert.ok(!engine.buildCss({ font: { ...font, enabled: false } }).includes('font-family:'));
 const css = engine.buildCss({ font });
-const typography = css.split('/* RTL-COPILOT font:')[1].split('/* RTL-COPILOT: lists')[0];
-for (const selector of ['.rendered-markdown ul', '.rendered-markdown ol', '.rendered-markdown table', '.markdown-body table']) {
-    assert.ok(typography.includes(selector), `missing ${selector}`);
-    assert.ok(typography.split('\n').some(line => line.includes(selector) && line.includes(' *:not(:is(')), `missing nested coverage for ${selector}`);
-}
-for (const excluded of ['pre,code', '.monaco-editor', '.monaco-diff-editor', '.katex', 'math', '.codicon', '.xterm', '.terminal-outer-container']) {
-    assert.ok(typography.includes(excluded), `missing exclusion ${excluded}`);
-}
-// :has() selectors re-match the whole workbench DOM on every mutation and
-// froze the chat renderer; typography must stay inheritance-based and small.
-assert.ok(!typography.includes(':has('), 'typography rules must not use :has()');
-assert.ok(typography.length < 70000, `font CSS too large: ${typography.length} bytes`);
-assert.ok(typography.includes('font-family:var(--vscode-editor-font-family,monospace)'));
-const codeRestoreSelectors = typography.split('\n').filter(line => line.includes(' :is(pre,code)'));
-assert.ok(codeRestoreSelectors.length > 0);
-for (const selector of codeRestoreSelectors) {
-    assert.ok(selector.includes(':not(:is('), 'protected descendants inside code wrappers must keep native typography');
-}
+const buttonRoots = 'button,[role="button"],input[type="button"],input[type="submit"],input[type="reset"],.monaco-button';
+// Check actual generated selectors, not just the presence of button names:
+// both custom typography and code restoration must exclude roots AND children.
+const fontRules = [...css.matchAll(/([^{}]+)\{([^{}]*font-family:[^{}]*)\}/g)];
+assert.equal(fontRules.length, 1);
+assert.match(fontRules[0][1], /\[data-rtlc-font\]$/);
+assert.ok(!css.includes(':has('));
+assert.ok(css.length < 15000);
+// Computed inheritance and streaming eligibility are exercised with real
+// Chromium/Monaco in test-code-isolation.cjs, not selector-string exclusions.
 const zeroCss = engine.buildCss({ font: { family: 'Vazirmatn', size: 0, lineHeight: 0 } });
 assert.ok(!zeroCss.includes('font-size:0'));
 assert.ok(!zeroCss.includes('line-height:0'));
@@ -80,4 +72,11 @@ for (const property of ['font-family', 'font-size', 'line-height']) {
     assert.ok(previewCss.includes(`${property}: var(--vscode-editor-${property}`));
 }
 assert.ok(previewCss.includes(':is(pre, code, .vscode-code-block) *'));
+const previewButtons = buttonRoots.replace(',.monaco-button', '').replaceAll(',', ', ');
+const previewCodeSelectors = previewCss.slice(0, previewCss.indexOf('{'));
+assert.equal(previewCodeSelectors.split(`:is(${previewButtons}) *))`).length - 1, 2,
+    'preview code restoration excludes button roots and descendants in both selectors');
+assert.ok(previewCss.includes(`:where([data-rtlc-preview-font] :is(${previewButtons}))`));
+assert.match(previewCss, /font-family: var\(--vscode-font-family, system-ui\);/);
+assert.match(previewCss, /font-size: var\(--vscode-font-size, 13px\);/);
 console.log('Font coverage tests passed (safe CSS, nested lists/tables, exclusions, defaults, preview application/reset).');

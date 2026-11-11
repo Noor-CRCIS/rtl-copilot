@@ -1,8 +1,8 @@
 /* Noor Persian RTL — built-in Markdown Preview */
 /* Prose inherits root typography, including nested lists and table cells.
    Code always uses editor metrics, not the surrounding prose metrics. */
-[data-rtlc-preview-font] :is(pre, code, .vscode-code-block),
-[data-rtlc-preview-font] :is(pre, code, .vscode-code-block) * {
+[data-rtlc-preview-font] :is(pre, code, .vscode-code-block):not(:is(button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"], :is(button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"]) *)),
+[data-rtlc-preview-font] :is(pre, code, .vscode-code-block) *:not(:is(button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"], :is(button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"]) *)) {
     font-family: var(--vscode-editor-font-family, monospace) !important;
     font-size: var(--vscode-editor-font-size, 14px) !important;
     line-height: var(--vscode-editor-line-height, normal) !important;
@@ -14,6 +14,14 @@
 [data-rtlc-preview-font] :is(.katex, .katex-display, .MathJax, math, svg, canvas) * {
     font-family: revert;
     font-size: revert;
+    line-height: normal;
+}
+
+/* Stop prose inheritance at button roots without overriding native component
+   rules or the icon fonts of their descendants. */
+:where([data-rtlc-preview-font] :is(button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"])) {
+    font-family: var(--vscode-font-family, system-ui);
+    font-size: var(--vscode-font-size, 13px);
     line-height: normal;
 }
 

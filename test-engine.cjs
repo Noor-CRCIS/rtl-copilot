@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const engine = require('./rtl-engine');
 
-assert.equal(engine.VERSION, '3.1.6');
+assert.equal(engine.VERSION, '3.1.9');
 
 const original = '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src \'self\'\"></head><body></body></html>';
 const patched = engine.applyPatchToHtml(original);
@@ -87,7 +87,7 @@ assert.match(editorRuntime, /\(retry\|\|0\)<3/);
 assert.match(editorRuntime, /ACTIVE_NATIVE\.hasTextFocus/);
 assert.match(editorRuntime, /description:'persian-rtl-majority-line'/);
 assert.match(editorRuntime, /textDirection:d==='rtl'\?TEXT_DIRECTION\.RTL:TEXT_DIRECTION\.LTR/);
-assert.match(editorRuntime, /globalThis\.__rtlCopilotRegisterEditor=registerEditor/);
+assert.match(editorRuntime, /globalThis\.__rtlCopilotRegisterEditor=registerNativeOwner/);
 assert.match(editorRuntime, /__rtlCopilotPendingEditors/);
 assert.match(editorRuntime, /document\.addEventListener\('keyup',manualDirectionUp,true\)/);
 assert.match(runtime, /isPromptEditor\(e\)/);
@@ -165,6 +165,14 @@ runtimeContext.__rtlCopilotApplyList(list, 'rtl');
 const firstListWrites = listWrites;
 runtimeContext.__rtlCopilotApplyList(list, 'rtl');
 assert.equal(listWrites, firstListWrites, 'unchanged streaming list must not rewrite direction and layout');
+const actionList = {
+    closest: () => ({}),
+    getAttribute: () => assert.fail('action list must be skipped before any processing'),
+    setAttribute: () => assert.fail('action list attributes must stay native'),
+    style: new Proxy({}, { set() { assert.fail('action list padding must stay native'); } }),
+};
+runtimeContext.__rtlCopilotApplyList(actionList, 'rtl');
+runtimeContext.__rtlCopilotApplyList(actionList, 'ltr');
 const manualOwner = {};
 runtimeContext.__rtlCopilotManual(manualOwner, 'rtl', apply);
 stable(manualOwner, 'English text with many english words', apply);
@@ -195,10 +203,10 @@ assert.match(runtime, /\.chat-request-text/);
 assert.match(runtime, /\.sessions-list-control \.session-title/);
 assert.match(runtime, /\.agent-sessions-viewer \.agent-session-title/);
 assert.match(runtime, /root\.closest\(selector\)/);
-assert.match(runtime, /notification-list-item-buttons-container/);
+assert.doesNotMatch(runtime.match(/var CFG=(.*);/)[1], /notification-list-item-buttons-container/);
 assert.match(runtime, /monaco-dialog-box \.dialog-message-text/);
-assert.match(runtime, /monaco-dialog-box > \.dialog-buttons-row/);
-assert.match(runtime, /notification-list-item-buttons-container \.monaco-button\.monaco-text-button:not\(\.monaco-dropdown-button\)/);
+assert.doesNotMatch(runtime, /monaco-dialog-box > \.dialog-buttons-row/);
+assert.doesNotMatch(runtime, /notification-list-item-buttons-container \.monaco-button\.monaco-text-button:not\(\.monaco-dropdown-button\)/);
 for (const selector of [
     '.explorer-viewlet .explorer-item .label-name',
     '.search-view .message',
@@ -213,14 +221,14 @@ for (const selector of [
 ]) assert.match(runtime, new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 assert.match(engine.buildCss(), /list-style-position:outside/);
 assert.match(engine.buildCss(), /notification-list-item-buttons-container.*direction:ltr!important/s);
-assert.match(engine.buildCss(), /monaco-dialog-box \.dialog-buttons>\.monaco-button\[data-rtlc-content-sig="rtl"\]/);
+assert.doesNotMatch(engine.buildCss(), /monaco-dialog-box \.dialog-buttons>\.monaco-button\[data-rtlc-content-sig="rtl"\]/);
 assert.match(engine.buildCss(), /notification-list-item-message\[data-rtlc-content-sig="rtl"\].*text-align:right!important/s);
 assert.match(engine.buildCss(), /notification-list-item-message\[data-rtlc-content-sig="ltr"\].*text-align:left!important/s);
 assert.match(engine.buildCss(), /notification-list-item-message\[data-rtlc-content-sig="rtl"\]>span/);
 const noNotificationsCss = engine.buildCss({ areas: { notifications: false } });
-assert.doesNotMatch(noNotificationsCss, /notification-list-item-buttons-container/);
+assert.doesNotMatch(noNotificationsCss, /\.monaco-workbench \.notifications-list-container \.notification-list-item-buttons-container,/);
 assert.doesNotMatch(noNotificationsCss, /monaco-dialog-box \.dialog-buttons-row/);
-assert.match(engine.buildCss(), /:is\(h1,h2,h3,h4,h5,h6\)/);
+assert.match(runtime, /:is\(h1,h2,h3,h4,h5,h6\)/);
 assert.match(engine.buildCss(), /\.session-title\[data-rtlc-content-sig="rtl"\]/);
 assert.match(engine.buildCss(), /\.agent-session-title\[data-rtlc-content-sig="rtl"\]/);
 assert.doesNotMatch(engine.buildCss(), /\.monaco-list-row\{direction:ltr/);
@@ -389,8 +397,9 @@ assert.match(extensionSource, /نسخهٔ Snap روی فایلسیستم فقط�
 assert.match(extensionSource, /https:\/\/code\.visualstudio\.com\/Download/);
 assert.match(extensionSource, /assertWritableInstallation\(found\.htmlPath\)/);
 assert.match(extensionSource, /workbench\.action\.quit/);
-assert.doesNotMatch(extensionSource, /workbench\.action\.reloadWindow/);
-assert.match(extensionSource, /'بستن VS Code'/);
+assert.match(extensionSource, /workbench\.action\.reloadWindow/);
+assert.match(extensionSource, /vscode\.l10n\.t\('بازخوانی پنجره'\)/);
+assert.match(extensionSource, /بازخوانی پنجره کافی نیست/);
 assert.doesNotMatch(extensionSource, /scheduleWindowsRelaunch/);
 // Execute the transaction's bundle branch with an already-patched bundle
 // and stale product checksum: no bundle write, but checksum and verification
@@ -401,6 +410,7 @@ assert.doesNotMatch(extensionSource, /scheduleWindowsRelaunch/);
     assert.ok(start > 0 && end > start);
     const run = new Function('engine', 'fs', 'candidateBundlePath', 'productInfo', 'updatedProduct',
         `const nativeEditorEnabled = true; let bundleWarning = null; const entries = [];
+        const assertChecksumSource = () => {}; // Full provenance exercised in test-integrity.cjs.
         ${extensionSource.slice(start, end)}
         return { updatedProduct, entries, bundlePath, bundleChecksum };`);
     const bytes = engine.applyEditorBridge('a.addCodeEditor(this);');

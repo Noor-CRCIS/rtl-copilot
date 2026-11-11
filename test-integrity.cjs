@@ -1,0 +1,73 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const vm = require('node:vm');
+const engine = require('./rtl-engine');
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rtlc-integrity-'));
+try {
+    const app = path.join(root, 'active', 'resources', 'app');
+    const html = path.join(app, 'out/vs/workbench/workbench.html');
+    const bundle = path.join(app, 'out/vs/workbench/workbench.desktop.main.js');
+    fs.mkdirSync(path.dirname(html), { recursive: true });
+    const stock = '<html><head></head><body></body></html>';
+    fs.writeFileSync(html, stock);
+    const productPath = path.join(app, 'product.json');
+    const product = { checksums: { 'vs/workbench/workbench.html': engine.checksum(stock), unrelated: 'preserve' } };
+    fs.writeFileSync(productPath, JSON.stringify(product));
+    fs.writeFileSync(path.join(root, 'product.json'), '{"checksums":{"unrelated":"ancestor"}}');
+    const vscode = { env: { appRoot: app }, workspace: { getConfiguration: () => ({ get: (_, fallback) => fallback }) } };
+    const context = { require: id => id === 'vscode' ? vscode : require(id), module: { exports: {} }, console, process, Buffer };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'extension.js'), 'utf8') + '\nmodule.exports={findWorkbenchHtml,findAllProductJson,assertChecksumSource,buildTransaction,verifyTransaction};', context);
+    const api = context.module.exports;
+    assert.equal(api.findWorkbenchHtml().htmlPath, html);
+    vscode.env.appRoot = path.join(root, 'server-without-desktop');
+    assert.equal(api.findWorkbenchHtml(), null, 'do not patch a different installed desktop');
+    vscode.env.appRoot = app;
+    assert.equal(api.findAllProductJson(html).length, 1);
+    const info = api.findAllProductJson(html)[0];
+    api.assertChecksumSource(html, info, engine.removePatchFromHtml);
+    fs.writeFileSync(html + '.rtl-backup', stock);
+    fs.writeFileSync(productPath + '.rtl-backup', JSON.stringify(product));
+    fs.writeFileSync(html, engine.applyPatchToHtml(stock));
+    api.assertChecksumSource(html, info, engine.removePatchFromHtml);
+    fs.appendFileSync(html, 'unexpected corruption');
+    assert.throws(() => api.assertChecksumSource(html, info, engine.removePatchFromHtml), /Unverified checksum source/);
+    fs.writeFileSync(html, engine.applyPatchToHtml(stock));
+    // An already bridged bundle must participate in checksum update/read-back
+    // even when the transaction has no bundle write (the 3.1.0 regression).
+    const stockBundle = 'fixture stock bundle';
+    const bridged = 'fixture bridged bundle';
+    const mockedEngine = { ...engine, applyEditorBridge: () => bridged, removeEditorBridge: source => source === bridged ? stockBundle : source, editorBridgeState: source => source === bridged ? 'valid' : 'absent' };
+    context.require = id => id === 'vscode' ? vscode : id === './rtl-engine' ? mockedEngine : require(id);
+    const second = { ...context, module: { exports: {} } };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'extension.js'), 'utf8') + '\nmodule.exports={buildTransaction,verifyTransaction};', second);
+    fs.writeFileSync(bundle, bridged);
+    fs.writeFileSync(bundle + '.rtl-backup', stockBundle);
+    product.checksums['vs/workbench/workbench.desktop.main.js'] = engine.checksum(stockBundle);
+    fs.writeFileSync(productPath, JSON.stringify(product));
+    fs.writeFileSync(productPath + '.rtl-backup', JSON.stringify(product));
+    const tx = second.module.exports.buildTransaction(html, true);
+    assert.equal(tx.changedProduct, true, 'stale bundle checksum changes product even without bundle write');
+    assert.equal(tx.bundlePath, bundle);
+    assert.ok(!tx.entries.some(entry => entry.path === bundle));
+    for (const entry of tx.entries) fs.writeFileSync(entry.path, entry.content);
+    second.module.exports.verifyTransaction(tx, true);
+    assert.equal(JSON.parse(fs.readFileSync(productPath)).checksums.unrelated, 'preserve');
+    fs.appendFileSync(bundle, 'corrupt');
+    assert.throws(() => second.module.exports.verifyTransaction(tx, true), /bundle/);
+    assert.equal(fs.readFileSync(path.join(root, 'product.json'), 'utf8'), '{"checksums":{"unrelated":"ancestor"}}');
+    // Execute the generated runtime helper: button text must not change layout.
+    const runtime = engine.buildRuntime();
+    const helper = runtime.match(/function applyDir\([^\n]+/)[0];
+    const actionHelper = runtime.match(/function actionUI\([^\n]+/)[0];
+    const controls = runtime.match(/var CONTROL_ROOTS=[^\n]+/)[0];
+    const apply = vm.runInNewContext(`${controls}\n${actionHelper}\n${helper};applyDir`, { A: 'data-rtlc-' });
+    const button = { closest: () => ({}), setAttribute: () => assert.fail('button mutated'), style: {} };
+    apply(button, 'rtl', 'content-sig');
+    assert.deepEqual(button.style, {});
+    console.log('INTEGRITY_AND_BUTTON_REGRESSIONS_OK');
+} finally {
+    fs.rmSync(root, { recursive: true, force: true });
+}

@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const path = require('path');
 
-const VERSION = '3.1.6';
+const VERSION = '3.1.9';
 const PATCH_START = '<!-- RTL-COPILOT:START -->';
 const PATCH_END = '<!-- RTL-COPILOT:END -->';
 const RUNTIME_NAME = 'rtl-copilot-runtime.js';
@@ -205,17 +205,26 @@ function normalizeOptions(raw = {}) {
 function enabledSelectors(options) {
     const result = [];
     for (const [name, definition] of Object.entries(AREA_DEFINITIONS)) {
-        if (options.areas[name] && !['lists', 'tables', 'inputs', 'editorsCode', 'terminal'].includes(name)) result.push(...definition.selectors);
+        if (options.areas[name] && !['lists', 'tables', 'inputs', 'editorsCode', 'terminal'].includes(name)) result.push(...definition.selectors.map(selector => name === 'chat' ? selector.replace(' > ', ' ') : selector));
     }
     result.push(...options.customSelectors);
-    return [...new Set(result)];
+    return [...new Set(result)].filter(selector => !selector.includes('.monaco-button'));
 }
+
+// Action lists are layout, not Markdown lists. Share this boundary between
+// generated CSS and runtime so skipping direction cannot leave padding writes.
+const ACTION_ROOTS = '.monaco-action-bar,.monaco-toolbar,[role="toolbar"],.actions-container,.action-item,.notification-list-item-buttons-container,.dialog-buttons-row,.dialog-buttons';
+const CONTROL_ROOTS = `${ACTION_ROOTS},button,[role="button"],input[type="button"],input[type="submit"],input[type="reset"],.monaco-button`;
+// Includes the renderer's placeholder BEFORE an editor is mounted into it.
+const NATIVE_ROOTS = '.monaco-editor,.monaco-diff-editor,.vscode-code-block,.rendered-markdown .code,.chat-markdown-part .code,[data-code],.interactive-result-code-block,.interactive-result-editor,.code-component__code,pre,code,.xterm,.terminal-outer-container,.katex,.katex-display,.MathJax,math,svg,canvas,.codicon,.icon';
+const proseGuard = `:not(:where(${CONTROL_ROOTS},:is(${CONTROL_ROOTS}) *))`;
+const proseSelectors = selectors => selectors.map(selector => `${selector}${proseGuard}`);
 
 function buildCss(rawOptions = {}) {
     const options = normalizeOptions(rawOptions);
     const generic = enabledSelectors(options);
     const contentRule = generic.length
-        ? `${generic.join(',\n')}{unicode-bidi:plaintext;text-align:start;} `
+        ? `[data-rtlc-content-sig]{unicode-bidi:plaintext;text-align:start;} `
         : '';
     const chunks = [`/* RTL-COPILOT ${VERSION}: semantic workbench RTL */`, contentRule];
 
@@ -224,45 +233,18 @@ function buildCss(rawOptions = {}) {
         if (options.font.family) fontDecls.push(`font-family:${options.font.family}!important`);
         if (options.font.size) fontDecls.push(`font-size:${options.font.size}px!important`);
         if (options.font.lineHeight) fontDecls.push(`line-height:${options.font.lineHeight}!important`);
-        const proseTargets = [...generic,
-            ...(options.areas.lists ? AREA_DEFINITIONS.lists.selectors : []),
-            ...(options.areas.tables ? AREA_DEFINITIONS.tables.selectors : []),
-            ...(options.areas.inputs ? AREA_DEFINITIONS.inputs.selectors.filter(s => !s.includes('.monaco-editor')) : [])];
-        // Apply the font once per view container and let normal inheritance
-        // reach every child. Per-leaf guarded selectors (or any :has usage)
-        // multiply selector matching per DOM mutation and freeze the workbench
-        // while chat streams tokens, which blanked rendered content.
-        const containers = [...new Set(proseTargets.map(selector => {
-            const branch = selector.lastIndexOf(' > ');
-            return branch > 0 ? selector.slice(0, branch).trim() : selector;
-        }))];
-        if (fontDecls.length && containers.length) {
-            // Editors, terminals, math, icon fonts, and Monaco host wrappers
-            // keep their own typography.
-            const protectedRoots = '.monaco-editor,.monaco-diff-editor,.vscode-code-block,.xterm,.terminal-outer-container,.katex,.katex-display,.MathJax,math,svg,canvas,.codicon,.icon,[class*="icon-"]';
-            // One :is() list per pattern keeps the sheet small; repeating the
-            // full guard per selector re-parses and re-matches thousands of times.
-            const containerList = `:is(${containers.join(',')})`;
-            const guard = `:not(:is(${protectedRoots},:is(${protectedRoots}) *))`;
-            chunks.push(`/* RTL-COPILOT font: user-selected font for RTL chat */\n${containerList}${guard},\n${containerList} *${guard}{${fontDecls.join(';')}}`);
-            // Plain Markdown code keeps editor typography. The Monaco host
-            // wrapper (.vscode-code-block) is never touched: its own element
-            // metrics must stay native so the embedded editor keeps measuring
-            // lines correctly and does not render blank.
-            const codeTargets = [
-                `${containerList} :is(pre,code)${guard}`,
-                `${containerList} :is(pre,code) *${guard}`];
-            chunks.push(`/* RTL-COPILOT code-font: code keeps editor typography */\n${codeTargets.join(',\n')}{font-family:var(--vscode-editor-font-family,monospace)!important;font-size:var(--vscode-editor-font-size,14px)!important;line-height:normal!important;}`);
-        }
+        // Runtime grants this marker only to prose leaves, never view containers.
+        // A descendant exclusion cannot prevent inherited font metrics.
+        if (fontDecls.length && generic.length) chunks.push(`/* RTL-COPILOT font: prose leaves only */\n[data-rtlc-font]{${fontDecls.join(';')}}`);
     }
 
     if (options.areas.lists) {
-        chunks.push(`${AREA_DEFINITIONS.lists.selectors.join(',\n')}{list-style-position:outside!important;padding-inline-start:1.6em!important;padding-inline-end:0!important;unicode-bidi:embed;text-align:start;}`);
-        chunks.push(`${AREA_DEFINITIONS.lists.selectors.map(s => `${s} > li`).join(',\n')}{unicode-bidi:embed;text-align:start;}`);
+        chunks.push(`[data-rtlc-list-sig]{list-style-position:outside!important;padding-inline-start:1.6em!important;padding-inline-end:0!important;unicode-bidi:embed;text-align:start;}`);
+        chunks.push(`[data-rtlc-list-item-sig]{unicode-bidi:embed;text-align:start;}`);
     }
     if (options.areas.tables) {
-        chunks.push(`${AREA_DEFINITIONS.tables.selectors.join(',\n')}{direction:ltr!important;unicode-bidi:isolate;text-align:start;}`);
-        chunks.push(`.monaco-workbench .rendered-markdown th,.monaco-workbench .rendered-markdown td,.monaco-workbench .rendered-markdown [role="cell"],.monaco-workbench .rendered-markdown [role="columnheader"],.monaco-workbench .rendered-markdown [role="rowheader"]{unicode-bidi:plaintext;text-align:start;}`);
+        chunks.push(`[data-rtlc-table]{direction:ltr!important;unicode-bidi:isolate;text-align:start;}`);
+        chunks.push(`[data-rtlc-cell-sig]{unicode-bidi:plaintext;text-align:start;}`);
     }
     if (options.areas.inputs) {
             const nativeInputs = AREA_DEFINITIONS.inputs.selectors.filter(selector => !selector.includes('.monaco-editor') && !selector.includes('.interactive-input-editor'));
@@ -274,15 +256,10 @@ function buildCss(rawOptions = {}) {
     if (options.areas.notifications) {
         const notificationMessage = '.monaco-workbench .notifications-list-container .notification-list-item .notification-list-item-message';
         const notificationSource = '.monaco-workbench .notifications-list-container .notification-list-item .notification-list-item-source';
-        const notificationButton = '.monaco-workbench .notifications-list-container .notification-list-item-buttons-container .monaco-button.monaco-text-button:not(.monaco-dropdown-button)';
         chunks.push(`.monaco-workbench .notifications-list-container .notification-list-item-buttons-container,.monaco-dialog-box .dialog-buttons-row,.monaco-dialog-box .dialog-buttons{direction:ltr!important;}`);
         chunks.push(`${notificationMessage}[data-rtlc-content-sig="rtl"],${notificationSource}[data-rtlc-content-sig="rtl"]{direction:rtl!important;text-align:right!important;unicode-bidi:normal!important;}`);
         chunks.push(`${notificationMessage}[data-rtlc-content-sig="ltr"],${notificationSource}[data-rtlc-content-sig="ltr"]{direction:ltr!important;text-align:left!important;unicode-bidi:normal!important;}`);
         chunks.push(`${notificationMessage}[data-rtlc-content-sig="rtl"]>span{direction:rtl!important;text-align:right!important;unicode-bidi:normal!important;}${notificationMessage}[data-rtlc-content-sig="ltr"]>span{direction:ltr!important;text-align:left!important;unicode-bidi:normal!important;}`);
-        chunks.push(`${notificationButton}[data-rtlc-content-sig="rtl"],.monaco-dialog-box .dialog-buttons>.monaco-button[data-rtlc-content-sig="rtl"]{direction:rtl!important;text-align:right!important;unicode-bidi:normal!important;}${notificationButton}[data-rtlc-content-sig="ltr"],.monaco-dialog-box .dialog-buttons>.monaco-button[data-rtlc-content-sig="ltr"]{direction:ltr!important;text-align:left!important;unicode-bidi:normal!important;}`);
-    }
-    if (options.areas.chat || options.areas.markdown || options.areas.markdownPreview) {
-        chunks.push(`.monaco-workbench .rendered-markdown pre,.monaco-workbench .rendered-markdown code,.monaco-workbench .markdown-body pre,.monaco-workbench .markdown-body code,.monaco-workbench .code-component__code{direction:ltr;unicode-bidi:normal;text-align:left;}`);
     }
     if (options.areas.sessions) {
         const sessions = AREA_DEFINITIONS.sessions.selectors.join(',\n');
@@ -297,6 +274,7 @@ function buildRuntime(rawOptions = {}) {
     const options = normalizeOptions(rawOptions);
     const config = {
         version: VERSION,
+        font: options.font.enabled && enabledSelectors(options).length > 0,
         mode: options.mode,
         observe: options.observe,
         selectors: [...enabledSelectors(options),
@@ -322,6 +300,9 @@ function buildRuntime(rawOptions = {}) {
 /* RTL-COPILOT external runtime ${VERSION} */
 (function(){
 var CFG=${serialized};
+var CONTROL_ROOTS=${JSON.stringify(CONTROL_ROOTS)};
+var NATIVE_ROOTS=${JSON.stringify(NATIVE_ROOTS)};
+var OWNED=new Map();
 var A='data-rtlc-';
 var NATIVE=new WeakMap();
 var ACTIVE_NATIVE=null;
@@ -342,7 +323,13 @@ function text(e){return(e.innerText||e.textContent||'').trim();}
 function collect(root,selector){var out=[],seen=new Set();function add(e){if(e&&!seen.has(e)){seen.add(e);out.push(e);}}try{if(root.nodeType===1&&root.matches&&root.matches(selector))add(root);if(root.nodeType===1&&root.closest)add(root.closest(selector));if(root.querySelectorAll)Array.prototype.forEach.call(root.querySelectorAll(selector),add);}catch(_){}return out;}
 function isPromptEditor(e){return!!(e&&e.closest&&e.closest('.chat-input-part,.interactive-input-part,.comment-input'));}
 function blocked(e){if(!e||!e.closest)return true;if(e.closest('script,style,svg,math,canvas,.katex,.katex-display,pre,code,.code-component__code,[aria-hidden="true"]'))return true;if(!CFG.allowEditor&&e.closest('.monaco-editor,.monaco-diff-editor,.notebook-editor')&&!isPromptEditor(e))return true;if(!CFG.allowTerminal&&e.closest('.xterm,.terminal-outer-container'))return true;return false;}
-function applyDir(e,d,key,force){if(!force&&e.getAttribute(A+key)===d)return;e.setAttribute(A+key,d);e.setAttribute('dir',d);e.style.direction=d;e.style.textAlign='start';}
+function actionUI(e){return!!(e&&e.closest&&e.closest(CONTROL_ROOTS));}
+function nativeBoundary(e){return!!(e&&(e.closest&&e.closest(NATIVE_ROOTS)||e.querySelector&&e.querySelector(NATIVE_ROOTS)));}
+var OWNED_STYLE=['direction','text-align','unicode-bidi','white-space','list-style-position','padding-inline-start','padding-inline-end'];
+function own(e){if(OWNED.has(e))return;var styles={};OWNED_STYLE.forEach(function(k){styles[k]=e.style.getPropertyValue?[e.style.getPropertyValue(k),e.style.getPropertyPriority(k)]:['',''];});OWNED.set(e,{styles:styles,dir:e.getAttribute('dir')});}
+function release(e){var original=OWNED.get(e);if(!original)return;var state=DIRECTION_STATES.get(e);if(state)clearTimeout(state.timer);DIRECTION_STATES.delete(e);OWNED_STYLE.forEach(function(k){var value=original.styles[k];if(value[0])e.style.setProperty(k,value[0],value[1]);else e.style.removeProperty(k);});if(!e.style.cssText)e.removeAttribute('style');if(original.dir===null)e.removeAttribute('dir');else e.setAttribute('dir',original.dir);Array.from(e.attributes).forEach(function(a){if(a.name.indexOf(A)===0)e.removeAttribute(a.name);});OWNED.delete(e);}
+function safeLeaf(e){if(nativeBoundary(e)||actionUI(e)||e.matches&&e.matches('.rendered-markdown,.markdown-body,.chat-markdown-part,.chat-output-container,.chat-list-item,.interactive-session,.interactive-item-container,.chat-message,.composer-message,.chat-request,ul,ol,table'))return false;return !(e.querySelector&&e.querySelector('div,p,blockquote,ul,ol,li,table,h1,h2,h3,h4,h5,h6,'+CONTROL_ROOTS));}
+function applyDir(e,d,key,force){if(actionUI(e)||nativeBoundary(e))return;if(!force&&e.getAttribute(A+key)===d)return;own(e);e.setAttribute(A+key,d);e.setAttribute('dir',d);e.style.direction=d;e.style.textAlign='start';}
 function inputValue(input){var editor=input.closest&&input.closest('.monaco-editor');if(!editor&&input.matches&&input.matches('.monaco-editor'))editor=input;if(editor)return text(editor.querySelector('.view-lines')||editor);if(typeof input.value==='string')return input.value;return text(input);}
 function isMonacoInput(input){return!!(input&&((input.matches&&input.matches('.monaco-editor,.interactive-input-editor'))||(input.closest&&input.closest('.monaco-editor,.interactive-input-editor'))||(input.querySelector&&input.querySelector('.monaco-editor'))));}
 function promptEditor(input){var editor=input&&input.closest&&input.closest('.monaco-editor');if(!editor&&input&&input.matches&&input.matches('.monaco-editor'))editor=input;if(!editor&&input&&input.querySelector)editor=input.querySelector('.monaco-editor');return editor&&editor.closest('.interactive-input-editor')||editor;}
@@ -353,12 +340,13 @@ function inputStyleSnapshot(input){return{dir:input.getAttribute('dir'),directio
 function restoreInputStyle(input,state){if(state.original.dir===null)input.removeAttribute('dir');else input.setAttribute('dir',state.original.dir);['direction','textAlign','unicodeBidi'].forEach(function(name){if(!input.style)return;var value=state.original[name],property=name.replace(/[A-Z]/g,function(c){return'-'+c.toLowerCase();});if(value)input.style[name]=value;else if(input.style.removeProperty)input.style.removeProperty(property);else input.style[name]='';});input.removeAttribute(A+'input-sig');}
 function inputDirectionState(input,value,apply){var state=DIRECTION_STATES.get(input);if(!state){state={direction:'',manual:'',timer:0,original:inputStyleSnapshot(input)};DIRECTION_STATES.set(input,state);}if(state.manual){apply(state.manual);return;}if(!value.trim()){clearTimeout(state.timer);state.direction='';restoreInputStyle(input,state);return;}if(!state.direction)state.direction=firstWordDirection(value);if(state.direction)apply(state.direction);}
 function manualOwner(input){return input&&input.closest&&(input.closest('.chat-input-part .monaco-editor,.interactive-input-part .monaco-editor,.chat-input-part [contenteditable="true"],.interactive-input-part [contenteditable="true"],.chat-input-part textarea,.interactive-input-part textarea,.comment-input textarea')||input);}
-function applyListDir(list,d){if(list.getAttribute(A+'list-dir')!==d)list.setAttribute(A+'list-dir',d);applyDir(list,d,'list-sig');if(list.style.listStylePosition!=='outside')list.style.listStylePosition='outside';if(list.style.paddingInlineStart!=='1.6em')list.style.paddingInlineStart='1.6em';if(list.style.paddingInlineEnd!=='0px'&&list.style.paddingInlineEnd!=='0')list.style.paddingInlineEnd='0';Array.prototype.forEach.call(list.children,function(li){if(li.tagName==='LI')applyDir(li,d,'list-item-sig');});}
+function applyListDir(list,d){if(actionUI(list)||nativeBoundary(list))return;own(list);if(list.getAttribute(A+'list-dir')!==d)list.setAttribute(A+'list-dir',d);applyDir(list,d,'list-sig');if(list.style.listStylePosition!=='outside')list.style.listStylePosition='outside';if(list.style.paddingInlineStart!=='1.6em')list.style.paddingInlineStart='1.6em';if(list.style.paddingInlineEnd!=='0px'&&list.style.paddingInlineEnd!=='0')list.style.paddingInlineEnd='0';Array.prototype.forEach.call(list.children,function(li){if(li.tagName==='LI')applyDir(li,d,'list-item-sig');});}
 function processLists(root){CFG.lists.forEach(function(sel){collect(root,sel).forEach(function(list){if(blocked(list))return;directionState(list,text(list),function(d){if(list.isConnected)applyListDir(list,d);});});});}
-function processTables(root){CFG.tables.forEach(function(sel){collect(root,sel).forEach(function(table){if(blocked(table))return;if(table.getAttribute(A+'table')!=='1')table.setAttribute(A+'table','1');if(table.style.direction!=='ltr')table.style.direction='ltr';if(table.style.unicodeBidi!=='isolate')table.style.unicodeBidi='isolate';table.querySelectorAll('th,td,[role="cell"],[role="columnheader"],[role="rowheader"]').forEach(function(cell){directionState(cell,text(cell),function(d){applyDir(cell,d,'cell-sig');});});});});}
+function processTables(root){CFG.tables.forEach(function(sel){collect(root,sel).forEach(function(table){if(blocked(table)||actionUI(table)||nativeBoundary(table))return;own(table);if(table.getAttribute(A+'table')!=='1')table.setAttribute(A+'table','1');if(table.style.direction!=='ltr')table.style.direction='ltr';if(table.style.unicodeBidi!=='isolate')table.style.unicodeBidi='isolate';table.querySelectorAll('th,td,[role="cell"],[role="columnheader"],[role="rowheader"]').forEach(function(cell){if(actionUI(cell)||nativeBoundary(cell))return;directionState(cell,text(cell),function(d){applyDir(cell,d,'cell-sig');});});});});}
 function enabledInput(input){if(!input||!input.closest)return false;if(input.closest('.chat-input-part,.interactive-input-part,.comment-input'))return CFG.inputAreas.prompt;if(input.closest('.search-view,.search-widget,.find-widget,.simple-find-part'))return CFG.inputAreas.search;if(input.closest('.settings-editor'))return CFG.inputAreas.settings;if(input.closest('.quick-input-widget'))return CFG.inputAreas.quickPick;return CFG.inputAreas.other;}
 function processInputs(root){if(!CFG.autoInputDirection)return;CFG.inputs.forEach(function(sel){collect(root,sel).forEach(function(input){var findInput=input.matches&&input.matches('input:not([type]),input[type="text"],input[type="search"]')&&input.closest('.find-widget,.simple-find-part');if((!findInput&&(blocked(input)||isMonacoInput(input)))||!enabledInput(input))return;var value=typeof input.value==='string'?input.value:text(input);inputDirectionState(input,value,function(d){applyDir(input,d,'input-sig');if(input.tagName==='TEXTAREA'||input.isContentEditable)input.style.unicodeBidi='plaintext';});});});}
-function processContent(root){CFG.selectors.forEach(function(sel){collect(root,sel).forEach(function(e){if(blocked(e)||e.tagName==='UL'||e.tagName==='OL'||e.tagName==='TABLE'||e.getAttribute('role')==='table')return;var value=text(e);if(isDirectoryTree(value)){applyDir(e,'ltr','content-sig');if(e.getAttribute(A+'directory-tree')!=='1'){e.setAttribute(A+'directory-tree','1');e.style.unicodeBidi='isolate';e.style.whiteSpace='pre-wrap';}return;}if(e.hasAttribute(A+'directory-tree')){e.removeAttribute(A+'directory-tree');e.style.removeProperty('unicode-bidi');e.style.removeProperty('white-space');}directionState(e,value,function(d){applyDir(e,d,'content-sig');});});});}
+function processContent(root){CFG.selectors.forEach(function(sel){collect(root,sel).forEach(function(e){if(blocked(e)||!safeLeaf(e)||e.tagName==='UL'||e.tagName==='OL'||e.tagName==='TABLE'||e.getAttribute('role')==='table')return;var value=text(e);if(isDirectoryTree(value)){applyDir(e,'ltr','content-sig');if(e.getAttribute(A+'directory-tree')!=='1'){e.setAttribute(A+'directory-tree','1');e.style.unicodeBidi='isolate';e.style.whiteSpace='pre-wrap';}return;}if(e.hasAttribute(A+'directory-tree')){e.removeAttribute(A+'directory-tree');e.style.removeProperty('unicode-bidi');e.style.removeProperty('white-space');}directionState(e,value,function(d){if(safeLeaf(e))applyDir(e,d,'content-sig');});});});}
+function processFonts(root){if(!CFG.font)return;CFG.selectors.concat(CFG.lists.map(function(s){return s+' li';}),CFG.tables.map(function(s){return s+' :is(th,td)';})).forEach(function(sel){collect(root,sel).forEach(function(e){if(!blocked(e)&&safeLeaf(e)){own(e);if(!e.hasAttribute(A+'font'))e.setAttribute(A+'font','1');}});});}
 function disposeNative(state){if(!state)return;state.disposed=true;clearTimeout(state.timer);if(state.host)try{delete state.host.__rtlCopilotEditor;}catch(_){}if(state.dom)try{delete state.dom.__rtlCopilotEditor;}catch(_){}try{state.collection.clear();}catch(_){}state.disposables.forEach(function(d){try{d.dispose();}catch(_){}});}
 function isPromptDom(dom){return!!(dom&&dom.closest&&dom.closest('.chat-input-part,.interactive-input-part'))}
 function lineRange(model,line){return{startLineNumber:line,startColumn:1,endLineNumber:line,endColumn:model.getLineMaxColumn(line)}}
@@ -372,11 +360,14 @@ function renderNative(editor,state){if(!CFG.autoEditorDirection){renderManualNat
 function scheduleNative(editor,state){if(!CFG.autoEditorDirection){clearTimeout(state.timer);renderManualNative(editor,state);return;}var model=editor.getModel&&editor.getModel();if(!model){state.collection.clear();return;}for(var line=1;line<=model.getLineCount();line++){if(!state.directions.has(line))state.directions.set(line,paragraphDirection(model.getLineContent(line)));}renderNative(editor,state);clearTimeout(state.timer);state.timer=setTimeout(function(){var current=editor.getModel&&editor.getModel();if(!current)return;var next=new Map();for(var line=1;line<=current.getLineCount();line++)next.set(line,paragraphDirection(current.getLineContent(line)));state.directions=next;for(var key of state.manualLines.keys())if(key>current.getLineCount())state.manualLines.delete(key);renderNative(editor,state);},DIRECTION_DELAY);}
 function rebaseLineState(map,changes){var entries=[...map.entries()];map.clear();entries.forEach(function(entry){var line=entry[0],value=entry[1];changes.forEach(function(c){var start=c.range.startLineNumber,end=c.range.endLineNumber,removed=end-start,added=(c.text.match(/\\n/g)||[]).length;if(line>end)line+=added-removed;else if(line>start&&line<=end)line=-1;});if(line>0)map.set(line,value);});}
 function registerEditor(editor,retry){if(!editor||NATIVE.has(editor)||!editor.createDecorationsCollection)return;var dom=editor.getContainerDomNode&&editor.getContainerDomNode()||editor.getDomNode&&editor.getDomNode(),host=dom&&dom.closest&&dom.closest('.interactive-input-editor'),prompt=isPromptDom(dom);if(!prompt&&!CFG.nativeEditor&&CFG.promptRtl&&(retry||0)<3){Promise.resolve().then(function(){registerEditor(editor,(retry||0)+1);});return;}if(prompt&&!CFG.promptRtl||!prompt&&!CFG.nativeEditor&&!CFG.fileManual)return;var state={collection:editor.createDecorationsCollection(),directions:new Map(),lineLocks:new Map(),manualLines:new Map(),timer:0,prompt:prompt,host:host,dom:dom,disposables:[],refreshQueued:false,disposed:false,lastPromptSignature:''};if(host)host.__rtlCopilotEditor=editor;if(dom)dom.__rtlCopilotEditor=editor;NATIVE.set(editor,state);state.disposables.push(editor.onDidFocusEditorText(function(){ACTIVE_NATIVE=editor;}));state.disposables.push(editor.onDidBlurEditorText(function(){if(ACTIVE_NATIVE===editor)ACTIVE_NATIVE=null;}));state.disposables.push(editor.onDidChangeModelContent(function(e){var changes=e.changes||[];if(e.isFlush){state.lineLocks.clear();state.lastPromptSignature='';}rebaseLineState(state.manualLines,changes);if(state.prompt){rebaseLineState(state.lineLocks,changes);schedulePromptNative(editor,state);}else{rebaseLineState(state.directions,changes);scheduleNative(editor,state);}}));state.disposables.push(editor.onDidChangeModel(function(){state.directions.clear();state.lineLocks.clear();state.manualLines.clear();state.lastPromptSignature='';if(state.prompt)schedulePromptNative(editor,state);else scheduleNative(editor,state);}));state.disposables.push(editor.onDidDispose(function(){if(ACTIVE_NATIVE===editor)ACTIVE_NATIVE=null;disposeNative(state);NATIVE.delete(editor);}));attachCommentDirection(editor,state);if(prompt)schedulePromptNative(editor,state);else scheduleNative(editor,state);}
-globalThis.__rtlCopilotRegisterEditor=registerEditor;
-var queued=globalThis.__rtlCopilotPendingEditors||[];delete globalThis.__rtlCopilotPendingEditors;queued.forEach(registerEditor);
+// CodeBlockPart constructs editors off-document, inside native host wrappers.
+// Never attach comment/manual decorations to chat output or diff editors.
+function registerNativeOwner(editor,retry){var dom=editor&&(editor.getContainerDomNode&&editor.getContainerDomNode()||editor.getDomNode&&editor.getDomNode());if(!dom)return;if(dom.closest&&dom.closest('.interactive-result-code-block,.interactive-result-editor,.monaco-diff-editor,[data-code],.vscode-code-block,.rendered-markdown,.chat-markdown-part'))return;if(dom.isConnected===false){if((retry||0)<3)Promise.resolve().then(function(){registerNativeOwner(editor,(retry||0)+1);});return;}registerEditor(editor);}
+globalThis.__rtlCopilotRegisterEditor=registerNativeOwner;
+var queued=globalThis.__rtlCopilotPendingEditors||[];delete globalThis.__rtlCopilotPendingEditors;queued.forEach(function(editor){registerNativeOwner(editor);});
 function activeNativeEditor(){if(ACTIVE_NATIVE&&NATIVE.has(ACTIVE_NATIVE)&&(!ACTIVE_NATIVE.hasTextFocus||ACTIVE_NATIVE.hasTextFocus()))return ACTIVE_NATIVE;var active=document.activeElement,dom=active&&active.closest&&active.closest('.monaco-editor');return dom&&dom.__rtlCopilotEditor||dom&&dom.closest('.interactive-input-editor')&&dom.closest('.interactive-input-editor').__rtlCopilotEditor||null;}
 function setNativeManual(editor,d){var state=editor&&NATIVE.get(editor),position=editor&&editor.getPosition&&editor.getPosition();if(!state||!position||!state.prompt&&!CFG.fileManual)return false;state.manualLines.set(position.lineNumber,d);if(state.prompt){state.lineLocks.delete(position.lineNumber);state.lastPromptSignature='';schedulePromptNative(editor,state);}else renderNative(editor,state);return true;}
-function fix(root){var base=root&&root.querySelectorAll?root:document;processLists(base);processTables(base);processInputs(base);processContent(base);}
+function fix(root){var base=root&&root.querySelectorAll?root:document;OWNED.forEach(function(_,e){if(!e.isConnected||nativeBoundary(e)||e.hasAttribute(A+'font')&&!safeLeaf(e))release(e);});processLists(base);processTables(base);processInputs(base);processContent(base);processFonts(base);}
 function promptTarget(e){return e&&e.closest&&e.closest('.chat-input-part textarea,.interactive-input-part textarea,.comment-input textarea,.chat-input-part [contenteditable="true"],.interactive-input-part [contenteditable="true"],.chat-input-part .monaco-editor,.interactive-input-part .monaco-editor');}
 var heldShift='';
 function shiftSide(event){if(event.code==='ShiftLeft')return'ltr';if(event.code==='ShiftRight')return'rtl';if(event.key==='Shift'&&event.location===1)return'ltr';if(event.key==='Shift'&&event.location===2)return'rtl';return'';}
@@ -459,7 +450,7 @@ function updateWorkbenchChecksum(product, appBase, htmlPath, htmlContent) {
     return { product: updated, key, hash: updated.checksums[key] };
 }
 
-// Repairs the "Your Code installation appears to be corrupt" warning: for
+// Computes disk checksum differences, not the running integrity result: for
 // every managed file (patched workbench HTML or Monaco bundle) whose stored
 // checksum no longer matches the bytes on disk, rewrite the stored checksum
 // to the actual digest. Files without a checksum key are left untouched,
